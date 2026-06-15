@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  background: #f9f9ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: #f9f9ff;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background: #f9f9ff;
+  color: #141b2b;
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+button,
+a,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hero-overlay {
+  background: linear-gradient(
+    to top,
+    rgba(20, 27, 43, 0.95) 0%,
+    rgba(20, 27, 43, 0.42) 52%,
+    rgba(20, 27, 43, 0.2) 100%
+  );
+}
+
+.phone-shell {
+  max-width: 430px;
+  margin: 0 auto;
+}
+
+.safe-bottom {
+  padding-bottom: calc(120px + env(safe-area-inset-bottom));
+}
