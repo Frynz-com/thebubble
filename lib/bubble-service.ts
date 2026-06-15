@@ -45,7 +45,64 @@ export async function getActiveBubble(slug?: string) {
   return data as BubbleRow;
 }
 
-export async function ensureGuestVisitor(slug?: string) {
+function profileFromVisitor(visitor: VisitorRow): BubbleProfile {
+  return {
+    name: visitor.nickname,
+    avatar: visitor.avatar_url ?? partnerConfig.images.user,
+    isAnonymous: visitor.is_guest,
+  };
+}
+
+function storeVisitorState(visitor: VisitorRow, slug: string) {
+  setStoredVisitorId(visitor.id, slug);
+  setStoredProfile(profileFromVisitor(visitor));
+}
+
+function createAnonymousProfile() {
+  const number = Math.floor(1000 + Math.random() * 9000);
+  const avatar = partnerConfig.people[Math.floor(Math.random() * partnerConfig.people.length)]?.avatar ?? partnerConfig.images.user;
+  return {
+    name: `Gast ${number}`,
+    avatar,
+  };
+}
+
+async function activateVisitor(visitor: VisitorRow, slug: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return visitor;
+
+  const { data, error } = await supabase
+    .from("visitors")
+    .update({
+      is_active: true,
+      left_at: null,
+      last_seen_at: new Date().toISOString(),
+    })
+    .eq("id", visitor.id)
+    .eq("bubble_id", visitor.bubble_id)
+    .eq("session_id", visitor.session_id)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("[visitor] activate failed", {
+      visitorId: visitor.id,
+      bubbleId: visitor.bubble_id,
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    logSupabaseError("activateVisitor", error);
+    throw error;
+  }
+
+  const nextVisitor = data as VisitorRow;
+  storeVisitorState(nextVisitor, slug);
+  return nextVisitor;
+}
+
+export async function ensureBubbleVisitor(slug?: string): Promise<BubbleContext> {
   const activeSlug = resolveBubbleSlug(slug);
   const supabase = getSupabaseBrowserClient();
   if (!supabase) {
@@ -58,39 +115,93 @@ export async function ensureGuestVisitor(slug?: string) {
   if (!bubble) return { status: "error", message: "Die Demo-Bubble ist nicht aktiv." } satisfies BubbleContext;
 
   const sessionId = getOrCreateSessionId();
-  const guestProfile = createGuestProfile();
+  const storedVisitorId = getStoredVisitorId(activeSlug);
+
+  if (storedVisitorId) {
+    const { data, error } = await supabase.from("visitors").select("*").eq("id", storedVisitorId).eq("bubble_id", bubble.id).eq("session_id", sessionId).maybeSingle();
+    if (error) {
+      console.error("[visitor] stored visitor lookup failed", {
+        slug: activeSlug,
+        bubbleId: bubble.id,
+        visitorId: storedVisitorId,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      logSupabaseError("ensureBubbleVisitor.findStoredVisitor", error);
+      throw error;
+    }
+    if (data) {
+      const visitor = await activateVisitor(data as VisitorRow, activeSlug);
+      return { status: "ready", bubble, visitor } satisfies BubbleContext;
+    }
+    console.warn("[visitor] stored visitor missing or mismatched, creating/reusing by session", {
+      slug: activeSlug,
+      bubbleId: bubble.id,
+      visitorId: storedVisitorId,
+    });
+  }
+
+  const { data: existingVisitor, error: existingError } = await supabase.from("visitors").select("*").eq("bubble_id", bubble.id).eq("session_id", sessionId).maybeSingle();
+  if (existingError) {
+    console.error("[visitor] session visitor lookup failed", {
+      slug: activeSlug,
+      bubbleId: bubble.id,
+      sessionId,
+      code: existingError.code,
+      message: existingError.message,
+      details: existingError.details,
+      hint: existingError.hint,
+    });
+    logSupabaseError("ensureBubbleVisitor.findSessionVisitor", existingError);
+    throw existingError;
+  }
+
+  if (existingVisitor) {
+    const visitor = await activateVisitor(existingVisitor as VisitorRow, activeSlug);
+    return { status: "ready", bubble, visitor } satisfies BubbleContext;
+  }
+
+  const anonymousProfile = createAnonymousProfile();
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("visitors")
-    .upsert(
-      {
-        bubble_id: bubble.id,
-        session_id: sessionId,
-        nickname: guestProfile.name,
-        avatar_url: guestProfile.avatar,
-        is_guest: true,
-        is_active: true,
-        left_at: null,
-        last_seen_at: now,
-      },
-      { onConflict: "bubble_id,session_id" },
-    )
+    .insert({
+      bubble_id: bubble.id,
+      session_id: sessionId,
+      nickname: anonymousProfile.name,
+      avatar_url: anonymousProfile.avatar,
+      is_guest: true,
+      is_active: true,
+      left_at: null,
+      joined_at: now,
+      last_seen_at: now,
+    })
     .select("*")
     .single();
 
   if (error) {
-    logSupabaseError("ensureGuestVisitor.upsertVisitor", error);
+    console.error("[visitor] insert failed", {
+      slug: activeSlug,
+      bubbleId: bubble.id,
+      sessionId,
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    logSupabaseError("ensureBubbleVisitor.insertVisitor", error);
     throw error;
   }
   const visitor = data as VisitorRow;
-  setStoredVisitorId(visitor.id, activeSlug);
-  setStoredProfile({
-    name: visitor.nickname,
-    avatar: visitor.avatar_url ?? partnerConfig.images.user,
-    isAnonymous: visitor.is_guest,
-  });
+  storeVisitorState(visitor, activeSlug);
 
   return { status: "ready", bubble, visitor } satisfies BubbleContext;
+}
+
+export async function ensureGuestVisitor(slug?: string) {
+  return ensureBubbleVisitor(slug);
 }
 
 export async function ensureProfileVisitor(profile: BubbleProfile, slug?: string) {
@@ -105,7 +216,11 @@ export async function ensureProfileVisitor(profile: BubbleProfile, slug?: string
   if (!bubble) return { status: "error", message: "Die Demo-Bubble ist nicht aktiv." } satisfies BubbleContext;
 
   const sessionId = getOrCreateSessionId();
-  const storedVisitorId = getStoredVisitorId(activeSlug);
+  let storedVisitorId = getStoredVisitorId(activeSlug);
+  if (!storedVisitorId) {
+    const context = await ensureBubbleVisitor(activeSlug);
+    storedVisitorId = context.visitor?.id ?? "";
+  }
   const now = new Date().toISOString();
   const payload = {
     bubble_id: bubble.id,
@@ -128,12 +243,7 @@ export async function ensureProfileVisitor(profile: BubbleProfile, slug?: string
     throw error;
   }
   const visitor = data as VisitorRow;
-  setStoredVisitorId(visitor.id, activeSlug);
-  setStoredProfile({
-    name: visitor.nickname,
-    avatar: visitor.avatar_url ?? partnerConfig.images.user,
-    isAnonymous: visitor.is_guest,
-  });
+  storeVisitorState(visitor, activeSlug);
   return { status: "ready", bubble, visitor } satisfies BubbleContext;
 }
 
@@ -144,6 +254,9 @@ export async function getCurrentContext(slug?: string): Promise<BubbleContext> {
 
   const bubble = await getActiveBubble(activeSlug);
   if (!bubble) return { status: "error", message: "Die Demo-Bubble ist nicht aktiv." };
+
+  const ensured = await ensureBubbleVisitor(activeSlug);
+  if (ensured.visitor) return { status: "ready", bubble, visitor: ensured.visitor };
 
   const visitorId = getStoredVisitorId(activeSlug);
   if (!visitorId) return { status: "ready", bubble };
@@ -174,10 +287,12 @@ export async function getStoredVisitor(slug?: string) {
   return data as VisitorRow | null;
 }
 
-export async function touchVisitor(visitorId: string) {
+export async function touchVisitor(visitorId: string, slug?: string) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase || !visitorId) return;
   const sessionId = getOrCreateSessionId();
+  const bubble = await getActiveBubble(slug);
+  if (!bubble) return;
   const { error } = await supabase
     .from("visitors")
     .update({
@@ -186,15 +301,18 @@ export async function touchVisitor(visitorId: string) {
       last_seen_at: new Date().toISOString(),
     })
     .eq("id", visitorId)
+    .eq("bubble_id", bubble.id)
     .eq("session_id", sessionId);
   if (error) logSupabaseError("touchVisitor", error);
 }
 
-export async function leaveVisitor(visitorId: string) {
+export async function leaveVisitor(visitorId: string, slug?: string) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase || !visitorId) return;
 
   const sessionId = getOrCreateSessionId();
+  const bubble = await getActiveBubble(slug);
+  if (!bubble) return;
   const now = new Date().toISOString();
   const { error } = await supabase
     .from("visitors")
@@ -204,6 +322,7 @@ export async function leaveVisitor(visitorId: string) {
       last_seen_at: now,
     })
     .eq("id", visitorId)
+    .eq("bubble_id", bubble.id)
     .eq("session_id", sessionId);
   if (error) logSupabaseError("leaveVisitor", error);
 }

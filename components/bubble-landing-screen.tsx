@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ArrowRight, Bolt } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
+import { BubbleSessionBootstrap } from "@/components/bubble-session-bootstrap";
 import { LiveChip } from "@/components/live-chip";
 import { PrimaryButton } from "@/components/primary-button";
 import { bubblePath } from "@/lib/bubble-routing";
@@ -9,6 +10,7 @@ import { partnerConfig } from "@/lib/partner-config";
 export function BubbleLandingScreen({ bubbleSlug }: { bubbleSlug: string }) {
   return (
     <main className="relative h-svh w-full overflow-hidden bg-on-surface">
+      <BubbleSessionBootstrap bubbleSlug={bubbleSlug} />
       <Image src={partnerConfig.images.hero} alt="" fill priority sizes="100vw" className="object-cover" />
       <div className="hero-overlay absolute inset-0 z-10" />
       <div className="pointer-events-none absolute -right-24 top-1/4 z-10 h-64 w-64 rounded-full bg-primary/20 blur-[100px]" />

@@ -5,6 +5,7 @@ import { Camera, UserRound, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
+import { BubbleSessionBootstrap } from "@/components/bubble-session-bootstrap";
 import { ensureGuestVisitor, ensureProfileVisitor } from "@/lib/bubble-service";
 import { bubblePath, getCurrentBubbleSlug } from "@/lib/bubble-routing";
 import { partnerConfig } from "@/lib/partner-config";
@@ -56,6 +57,7 @@ export default function JoinPage() {
 
   return (
     <main className="min-h-svh overflow-hidden bg-surface">
+      <BubbleSessionBootstrap />
       <div className="pointer-events-none fixed -right-20 -top-24 h-[300px] w-[300px] rounded-full bg-primary/5 blur-[120px]" />
       <div className="pointer-events-none fixed -bottom-28 -left-24 h-[350px] w-[350px] rounded-full bg-secondary/5 blur-[120px]" />
 

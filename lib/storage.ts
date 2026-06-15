@@ -41,6 +41,7 @@ export function clearStoredProfile() {
   window.localStorage.removeItem(profileKey);
   window.localStorage.removeItem(voteKey);
   window.localStorage.removeItem(getVisitorKey());
+  window.localStorage.removeItem(getLegacyVisitorKey());
 }
 
 export function createGuestProfile(): BubbleProfile {
@@ -84,15 +85,20 @@ export function getOrCreateSessionId() {
 }
 
 function getVisitorKey(slug = getCurrentBubbleSlug()) {
+  return `thebubble_visitor_${normalizeBubbleSlug(slug)}`;
+}
+
+function getLegacyVisitorKey(slug = getCurrentBubbleSlug()) {
   return `${visitorKey}:${normalizeBubbleSlug(slug)}`;
 }
 
 export function getStoredVisitorId(slug?: string) {
   if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(getVisitorKey(slug)) ?? window.localStorage.getItem(visitorKey) ?? "";
+  return window.localStorage.getItem(getVisitorKey(slug)) ?? window.localStorage.getItem(getLegacyVisitorKey(slug)) ?? window.localStorage.getItem(visitorKey) ?? "";
 }
 
 export function setStoredVisitorId(value: string, slug?: string) {
   window.localStorage.setItem(getVisitorKey(slug), value);
+  window.localStorage.removeItem(getLegacyVisitorKey(slug));
   window.localStorage.removeItem(visitorKey);
 }
