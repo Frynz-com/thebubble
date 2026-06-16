@@ -183,5 +183,23 @@ export const partnerConfig = {
   },
 };
 
+export function getBubbleBranding(slug: string) {
+  if (slug === "testbubble") {
+    return {
+      partnerName: "Test Bubble",
+      eventName: "Internal Test",
+      heroImage: partnerConfig.images.hero,
+      socialProof: "Test-Bubble ist bereit",
+    };
+  }
+
+  return {
+    partnerName: "The Bubble Demo",
+    eventName: "Matchday Demo",
+    heroImage: "/images/demo-stadium.jpg",
+    socialProof: "42 Personen sind gerade dabei",
+  };
+}
+
 export const successIcon = Trophy;
 export const fallbackBenefitIcon = Gift;

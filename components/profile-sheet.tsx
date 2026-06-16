@@ -4,10 +4,10 @@ import Image from "next/image";
 import { ImageUp, LogOut, Pencil, UserRound, X } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ensureProfileVisitor, getStoredVisitor, leaveVisitor } from "@/lib/bubble-service";
 import { uploadVisitorAvatar } from "@/lib/avatar-service";
-import { bubblePath, getCurrentBubbleSlug } from "@/lib/bubble-routing";
+import { bubblePath, getBubbleSlugFromPathname } from "@/lib/bubble-routing";
 import { partnerConfig } from "@/lib/partner-config";
 import { BubbleProfile, clearStoredProfile, getStoredProfile, getStoredVisitorId, setStoredProfile } from "@/lib/storage";
 
@@ -21,6 +21,7 @@ function defaultProfile(): BubbleProfile {
 
 export function ProfileSheet() {
   const router = useRouter();
+  const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -30,24 +31,26 @@ export function ProfileSheet() {
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
+  const activeSlug = getBubbleSlugFromPathname(pathname);
 
   useEffect(() => {
     setMounted(true);
-    const stored = getStoredProfile() ?? defaultProfile();
+    const slug = getBubbleSlugFromPathname(pathname);
+    const stored = getStoredProfile(slug) ?? defaultProfile();
     setProfile(stored);
     setName(stored.name);
     setAvatar(stored.avatar);
 
     async function hydrateFromVisitor() {
       try {
-        const visitor = await getStoredVisitor();
+        const visitor = await getStoredVisitor(slug);
         if (!visitor) return;
         const nextProfile = {
           name: visitor.nickname,
           avatar: visitor.avatar_url ?? partnerConfig.images.user,
           isAnonymous: visitor.is_guest,
         };
-        setStoredProfile(nextProfile);
+        setStoredProfile(nextProfile, slug);
         setProfile(nextProfile);
         setName(nextProfile.name);
         setAvatar(nextProfile.avatar);
@@ -57,7 +60,7 @@ export function ProfileSheet() {
     }
 
     void hydrateFromVisitor();
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -69,12 +72,12 @@ export function ProfileSheet() {
   }, [open]);
 
   async function refreshProfile(next: BubbleProfile) {
-    setStoredProfile(next);
+    setStoredProfile(next, activeSlug);
     setProfile(next);
     setName(next.name);
     setAvatar(next.avatar);
     window.dispatchEvent(new Event("bubble-profile-change"));
-    const result = await ensureProfileVisitor(next);
+    const result = await ensureProfileVisitor(next, activeSlug);
     if (result.message) setMessage(result.message);
   }
 
@@ -102,6 +105,7 @@ export function ProfileSheet() {
     setMessage("");
     try {
       const result = await uploadVisitorAvatar(file, name.trim() || profile.name, {
+        bubbleSlug: activeSlug,
         onStage: (stage) => {
           setUploadStatus(stage === "processing" ? "Bild wird zugeschnitten ..." : "Profilbild wird hochgeladen ...");
         },
@@ -120,12 +124,12 @@ export function ProfileSheet() {
   }
 
   async function leaveBubble() {
-    const visitorId = getStoredVisitorId();
-    if (visitorId) await leaveVisitor(visitorId);
-    clearStoredProfile();
+    const visitorId = getStoredVisitorId(activeSlug);
+    if (visitorId) await leaveVisitor(visitorId, activeSlug);
+    clearStoredProfile(activeSlug);
     setOpen(false);
     setEditing(false);
-    router.push(bubblePath(getCurrentBubbleSlug()));
+    router.push(bubblePath(activeSlug));
   }
 
   function closeSheet() {

@@ -20,6 +20,7 @@ export type AvatarUploadResult = {
 type AvatarUploadStage = "processing" | "uploading";
 
 type AvatarUploadOptions = {
+  bubbleSlug?: string;
   onStage?: (stage: AvatarUploadStage) => void;
 };
 
@@ -59,7 +60,7 @@ export async function uploadVisitorAvatar(file: File, nickname?: string, options
     });
   }
 
-  const [bubble, visitor] = await Promise.all([getActiveBubble(), getStoredVisitor()]);
+  const [bubble, visitor] = await Promise.all([getActiveBubble(options?.bubbleSlug), getStoredVisitor(options?.bubbleSlug)]);
   if (!bubble || !visitor) {
     console.error("[avatar-upload] missing bubble or visitor", {
       hasBubble: Boolean(bubble),
@@ -105,7 +106,7 @@ export async function uploadVisitorAvatar(file: File, nickname?: string, options
 
   const { data } = supabase.storage.from(profileImagesBucket).getPublicUrl(path);
   const publicUrl = `${data.publicUrl}?v=${Date.now()}`;
-  const currentProfile = getStoredProfile();
+  const currentProfile = getStoredProfile(options?.bubbleSlug);
   const nextProfile: BubbleProfile = {
     name: nickname?.trim() || currentProfile?.name || visitor.nickname,
     avatar: publicUrl,
@@ -113,7 +114,7 @@ export async function uploadVisitorAvatar(file: File, nickname?: string, options
   };
 
   try {
-    await ensureProfileVisitor(nextProfile);
+    await ensureProfileVisitor(nextProfile, options?.bubbleSlug);
   } catch (error) {
     console.error("[avatar-upload] visitor avatar_url update failed", {
       bubbleId: bubble.id,
@@ -123,7 +124,7 @@ export async function uploadVisitorAvatar(file: File, nickname?: string, options
     });
     throw error;
   }
-  setStoredProfile(nextProfile);
+  setStoredProfile(nextProfile, options?.bubbleSlug);
 
   return {
     profile: nextProfile,

@@ -12,7 +12,7 @@ import { partnerConfig } from "@/lib/partner-config";
 import { removeBubbleRealtime, subscribeToBubbleRealtime } from "@/lib/realtime";
 import type { PollRow, PollVoteRow, VisitorRow } from "@/lib/supabase/types";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { voteKey } from "@/lib/storage";
+import { getVoteKey } from "@/lib/storage";
 
 const options = [
   { id: "home", label: partnerConfig.homeTeam, percent: 48 },
@@ -34,6 +34,7 @@ export function LiveVote() {
   }, [activeOptions, votes]);
 
   useEffect(() => {
+    const voteKey = getVoteKey();
     setSelected(window.localStorage.getItem(voteKey) ?? "");
     let mounted = true;
     let channel: RealtimeChannel | null = null;
@@ -85,7 +86,7 @@ export function LiveVote() {
       }
     }
     setSelected(id);
-    window.localStorage.setItem(voteKey, id);
+    window.localStorage.setItem(getVoteKey(), id);
   }
 
   return (

@@ -22,10 +22,11 @@ export default function JoinPage() {
     setBusy(true);
     setMessage("");
     try {
-      const result = await ensureGuestVisitor();
+      const bubbleSlug = getCurrentBubbleSlug();
+      const result = await ensureGuestVisitor(bubbleSlug);
       if (result.message) setMessage(result.message);
       window.dispatchEvent(new Event("bubble-profile-change"));
-      router.push(bubblePath(getCurrentBubbleSlug(), "/live"));
+      router.push(bubblePath(bubbleSlug, "/live"));
     } catch (error) {
       logSupabaseError("join.anonymous", error);
       setMessage("Verbindung fehlgeschlagen. Bitte versuche es erneut.");
@@ -39,14 +40,15 @@ export default function JoinPage() {
     setBusy(true);
     setMessage("");
     try {
+      const bubbleSlug = getCurrentBubbleSlug();
       const result = await ensureProfileVisitor({
         name: nickname.trim() || "Bubble Gast",
         avatar: partnerConfig.images.onboarding,
         isAnonymous: false,
-      });
+      }, bubbleSlug);
       if (result.message) setMessage(result.message);
       window.dispatchEvent(new Event("bubble-profile-change"));
-      router.push(bubblePath(getCurrentBubbleSlug(), "/live"));
+      router.push(bubblePath(bubbleSlug, "/live"));
     } catch (error) {
       logSupabaseError("join.profile", error);
       setMessage("Profil konnte nicht gespeichert werden.");

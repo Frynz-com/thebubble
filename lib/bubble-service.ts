@@ -55,7 +55,7 @@ function profileFromVisitor(visitor: VisitorRow): BubbleProfile {
 
 function storeVisitorState(visitor: VisitorRow, slug: string) {
   setStoredVisitorId(visitor.id, slug);
-  setStoredProfile(profileFromVisitor(visitor));
+  setStoredProfile(profileFromVisitor(visitor), slug);
 }
 
 function createAnonymousProfile() {
@@ -107,14 +107,14 @@ export async function ensureBubbleVisitor(slug?: string): Promise<BubbleContext>
   const supabase = getSupabaseBrowserClient();
   if (!supabase) {
     const profile = createGuestProfile();
-    setStoredProfile(profile);
+    setStoredProfile(profile, activeSlug);
     return { status: "offline", message: "Supabase ist noch nicht konfiguriert. Die App läuft lokal im Demo-Modus.", visitor: null } satisfies BubbleContext;
   }
 
   const bubble = await getActiveBubble(activeSlug);
   if (!bubble) return { status: "error", message: "Die Demo-Bubble ist nicht aktiv." } satisfies BubbleContext;
 
-  const sessionId = getOrCreateSessionId();
+  const sessionId = getOrCreateSessionId(activeSlug);
   const storedVisitorId = getStoredVisitorId(activeSlug);
 
   if (storedVisitorId) {
@@ -208,14 +208,14 @@ export async function ensureProfileVisitor(profile: BubbleProfile, slug?: string
   const activeSlug = resolveBubbleSlug(slug);
   const supabase = getSupabaseBrowserClient();
   if (!supabase) {
-    setStoredProfile(profile);
+    setStoredProfile(profile, activeSlug);
     return { status: "offline", message: "Supabase ist noch nicht konfiguriert. Dein Profil wurde lokal gespeichert.", visitor: null } satisfies BubbleContext;
   }
 
   const bubble = await getActiveBubble(activeSlug);
   if (!bubble) return { status: "error", message: "Die Demo-Bubble ist nicht aktiv." } satisfies BubbleContext;
 
-  const sessionId = getOrCreateSessionId();
+  const sessionId = getOrCreateSessionId(activeSlug);
   let storedVisitorId = getStoredVisitorId(activeSlug);
   if (!storedVisitorId) {
     const context = await ensureBubbleVisitor(activeSlug);
@@ -275,7 +275,7 @@ export async function getStoredVisitor(slug?: string) {
   const visitorId = getStoredVisitorId(activeSlug);
   if (!supabase || !visitorId) return null;
 
-  const sessionId = getOrCreateSessionId();
+  const sessionId = getOrCreateSessionId(activeSlug);
   const bubble = await getActiveBubble(activeSlug);
   if (!bubble) return null;
   const { data, error } = await supabase.from("visitors").select("*").eq("id", visitorId).eq("bubble_id", bubble.id).eq("session_id", sessionId).maybeSingle();
@@ -290,8 +290,9 @@ export async function getStoredVisitor(slug?: string) {
 export async function touchVisitor(visitorId: string, slug?: string) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase || !visitorId) return;
-  const sessionId = getOrCreateSessionId();
-  const bubble = await getActiveBubble(slug);
+  const activeSlug = resolveBubbleSlug(slug);
+  const sessionId = getOrCreateSessionId(activeSlug);
+  const bubble = await getActiveBubble(activeSlug);
   if (!bubble) return;
   const { error } = await supabase
     .from("visitors")
@@ -310,8 +311,9 @@ export async function leaveVisitor(visitorId: string, slug?: string) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase || !visitorId) return;
 
-  const sessionId = getOrCreateSessionId();
-  const bubble = await getActiveBubble(slug);
+  const activeSlug = resolveBubbleSlug(slug);
+  const sessionId = getOrCreateSessionId(activeSlug);
+  const bubble = await getActiveBubble(activeSlug);
   if (!bubble) return;
   const now = new Date().toISOString();
   const { error } = await supabase

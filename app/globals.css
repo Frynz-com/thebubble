@@ -25,6 +25,11 @@ body {
   letter-spacing: 0;
 }
 
+.landing-screen {
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+
 button,
 a,
 input {

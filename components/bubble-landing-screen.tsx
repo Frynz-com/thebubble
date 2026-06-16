@@ -4,21 +4,22 @@ import { BrandMark } from "@/components/brand-mark";
 import { BubbleSessionBootstrap } from "@/components/bubble-session-bootstrap";
 import { LiveChip } from "@/components/live-chip";
 import { PrimaryButton } from "@/components/primary-button";
-import { bubblePath } from "@/lib/bubble-routing";
-import { partnerConfig } from "@/lib/partner-config";
+import { bubblePath, normalizeBubbleSlug } from "@/lib/bubble-routing";
+import { getBubbleBranding, partnerConfig } from "@/lib/partner-config";
 
 export function BubbleLandingScreen({ bubbleSlug }: { bubbleSlug: string }) {
-  return (
-    <main className="relative h-svh w-full overflow-hidden bg-on-surface">
-      <BubbleSessionBootstrap bubbleSlug={bubbleSlug} />
-      <Image src={partnerConfig.images.hero} alt="" fill priority sizes="100vw" className="object-cover" />
-      <div className="hero-overlay absolute inset-0 z-10" />
-      <div className="pointer-events-none absolute -right-24 top-1/4 z-10 h-64 w-64 rounded-full bg-primary/20 blur-[100px]" />
-      <div className="pointer-events-none absolute -left-24 bottom-1/4 z-10 h-80 w-80 rounded-full bg-secondary/10 blur-[100px]" />
+  const normalizedSlug = normalizeBubbleSlug(bubbleSlug);
+  const branding = getBubbleBranding(normalizedSlug);
 
-      <div className="phone-shell relative z-20 flex h-full flex-col px-5 pb-12 pt-8">
+  return (
+    <main className="landing-screen relative w-full overflow-hidden bg-on-surface">
+      <BubbleSessionBootstrap bubbleSlug={normalizedSlug} />
+      <Image src={branding.heroImage} alt="" fill priority sizes="100vw" className="object-cover object-center" />
+      <div className="hero-overlay absolute inset-0 z-10" />
+
+      <div className="phone-shell relative z-20 flex min-h-[inherit] flex-col px-5 pb-[calc(3rem+env(safe-area-inset-bottom))] pt-[calc(2rem+env(safe-area-inset-top))]">
         <header className="flex items-start justify-between">
-          <BrandMark inverted partnerName={partnerConfig.partnerName} subtitle={partnerConfig.eventName} />
+          <BrandMark inverted partnerName={branding.partnerName} subtitle={branding.eventName} />
           <LiveChip dark />
         </header>
 
@@ -33,11 +34,11 @@ export function BubbleLandingScreen({ bubbleSlug }: { bubbleSlug: string }) {
                 </span>
               ))}
             </div>
-            <span className="text-sm font-bold text-white/90">42 Personen sind gerade dabei</span>
+            <span className="text-sm font-bold text-white/90">{branding.socialProof}</span>
           </div>
 
           <div className="space-y-5 text-center">
-            <PrimaryButton href={bubblePath(bubbleSlug, "/join")} icon={<ArrowRight size={20} />}>
+            <PrimaryButton href={bubblePath(normalizedSlug, "/join")} icon={<ArrowRight size={20} />}>
               Jetzt Bubble betreten
             </PrimaryButton>
             <p className="flex items-center justify-center gap-1.5 text-sm font-semibold text-white/55">
