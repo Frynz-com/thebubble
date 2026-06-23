@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { ensureBubbleVisitor } from "@/lib/bubble-service";
 import { getCurrentBubbleSlug } from "@/lib/bubble-routing";
+import { trackBubbleEvent } from "@/lib/analytics";
 
 export function BubbleSessionBootstrap({ bubbleSlug }: { bubbleSlug?: string }) {
   useEffect(() => {
@@ -19,6 +20,7 @@ export function BubbleSessionBootstrap({ bubbleSlug }: { bubbleSlug?: string }) 
             visitorId: context.visitor.id,
             isAnonymous: context.visitor.is_guest,
           });
+          void trackBubbleEvent("enter_bubble", { source: "bootstrap" }, slug);
         }
       } catch (error) {
         console.error("[visitor] bootstrap failed", error);

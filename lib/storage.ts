@@ -1,4 +1,3 @@
-import { partnerConfig } from "./partner-config";
 import { getCurrentBubbleSlug, normalizeBubbleSlug } from "./bubble-routing";
 
 export type BubbleProfile = {
@@ -56,13 +55,11 @@ export function clearStoredProfile(slug?: string) {
 }
 
 export function createGuestProfile(): BubbleProfile {
-  const number = Math.floor(10 + Math.random() * 90);
-  const avatars = partnerConfig.people.map((person) => person.avatar);
-  const avatar = avatars[Math.floor(Math.random() * avatars.length)] ?? partnerConfig.images.user;
+  const number = Math.floor(1000 + Math.random() * 9000);
 
   return {
-    name: `Bubble Gast ${number}`,
-    avatar,
+    name: `Gast ${number}`,
+    avatar: "",
     isAnonymous: true,
   };
 }

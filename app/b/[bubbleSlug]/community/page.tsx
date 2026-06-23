@@ -1,17 +1,16 @@
-import { notFound } from "next/navigation";
-import { BubbleSuccessScreen } from "@/components/bubble-success-screen";
+import { notFound, redirect } from "next/navigation";
 import { normalizeBubbleSlug } from "@/lib/bubble-routing";
 import { getActiveServerBubble } from "@/lib/bubble-server";
 
-type BubblePageProps = {
+type BubbleLinkPageProps = {
   params: Promise<{ bubbleSlug: string }>;
 };
 
-export default async function BubbleSuccessPage({ params }: BubblePageProps) {
+export default async function BubbleCommunityLinkPage({ params }: BubbleLinkPageProps) {
   const { bubbleSlug } = await params;
   const normalizedSlug = normalizeBubbleSlug(bubbleSlug);
   const bubble = await getActiveServerBubble(normalizedSlug);
   if (!bubble) notFound();
 
-  return <BubbleSuccessScreen bubbleSlug={normalizedSlug} />;
+  redirect(`/${normalizedSlug}/community`);
 }

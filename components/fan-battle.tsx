@@ -7,7 +7,8 @@ import {
   getCurrentContext,
   submitFanBattleEntry,
 } from "@/lib/bubble-service";
-import { partnerConfig } from "@/lib/partner-config";
+import { useBubbleConfig } from "@/lib/bubble-config";
+import { getCurrentBubbleSlug } from "@/lib/bubble-routing";
 import { removeBubbleRealtime, subscribeToBubbleRealtime } from "@/lib/realtime";
 import type { FanBattleRow, VisitorRow } from "@/lib/supabase/types";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -16,6 +17,8 @@ type Team = "home" | "away";
 type Phase = "choose" | "tap" | "result";
 
 export function FanBattle() {
+  const bubbleSlug = getCurrentBubbleSlug();
+  const config = useBubbleConfig(bubbleSlug);
   const [phase, setPhase] = useState<Phase>("choose");
   const [team, setTeam] = useState<Team | null>(null);
   const [count, setCount] = useState(0);
@@ -37,9 +40,9 @@ export function FanBattle() {
       away,
       homePercent: Math.round((home / total) * 100),
       awayPercent: Math.round((away / total) * 100),
-      leader: home >= away ? partnerConfig.homeTeam : partnerConfig.awayTeam,
+      leader: home >= away ? (battle?.home_team ?? "Option A") : (battle?.away_team ?? "Option B"),
     };
-  }, [battle?.away_taps, battle?.home_taps, count, phase, submitted, team]);
+  }, [battle?.away_taps, battle?.away_team, battle?.home_taps, battle?.home_team, count, phase, submitted, team]);
 
   useEffect(() => {
     let mounted = true;
@@ -47,7 +50,7 @@ export function FanBattle() {
 
     async function load() {
       try {
-        const context = await getCurrentContext();
+        const context = await getCurrentContext(bubbleSlug);
         if (!mounted || !context.bubble) {
           if (context.message) setMessage(context.message);
           return;
@@ -57,7 +60,7 @@ export function FanBattle() {
         const activeBattle = await fetchActiveFanBattle(context.bubble.id);
         if (!mounted) return;
         if (!activeBattle) {
-          setMessage("Fan Battle ist nicht aktiv.");
+          setMessage("Diese Live-Aktion ist nicht aktiv.");
           return;
         }
         setBattle(activeBattle);
@@ -70,7 +73,7 @@ export function FanBattle() {
           });
         }
       } catch {
-        if (mounted) setMessage("Fan Battle konnte nicht geladen werden.");
+        if (mounted) setMessage("Live-Aktion konnte nicht geladen werden.");
       }
     }
 
@@ -80,7 +83,7 @@ export function FanBattle() {
       mounted = false;
       removeBubbleRealtime(channel);
     };
-  }, []);
+  }, [bubbleSlug]);
 
   useEffect(() => {
     if (phase !== "tap") return;
@@ -139,18 +142,18 @@ export function FanBattle() {
     <section className="overflow-hidden rounded-[2rem] bg-white shadow-ambient animate-pop-in">
       <div className="p-5">
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-secondary">Hauptaktion</p>
-        <h2 className="text-2xl font-bold leading-8 text-on-surface">Fan Battle</h2>
-        <p className="mt-2 text-base leading-6 text-on-surface-variant">Welches Team holt sich die Stimmung?</p>
+        <h2 className="text-2xl font-bold leading-8 text-on-surface">{config.challengeTitle}</h2>
+        <p className="mt-2 text-base leading-6 text-on-surface-variant">{config.challengeDescription}</p>
         {message ? <p className="mt-3 rounded-[1rem] bg-surface-container-low p-3 text-sm font-semibold text-on-surface-variant">{message}</p> : null}
       </div>
 
       {phase === "choose" ? (
         <div className="grid gap-3 px-5 pb-5">
           <button className="min-h-14 rounded-full bg-primary text-sm font-bold text-on-primary shadow-active transition active:scale-95" type="button" onClick={() => selectTeam("home")}>
-            {battle?.home_team ?? partnerConfig.homeTeam}
+            {battle?.home_team ?? "Option A"}
           </button>
           <button className="min-h-14 rounded-full border-2 border-outline-variant text-sm font-bold text-primary transition active:scale-95" type="button" onClick={() => selectTeam("away")}>
-            {battle?.away_team ?? partnerConfig.awayTeam}
+            {battle?.away_team ?? "Option B"}
           </button>
         </div>
       ) : null}
@@ -180,8 +183,8 @@ export function FanBattle() {
           </div>
 
           <div className="space-y-3">
-            <BattleBar label={battle?.home_team ?? partnerConfig.homeTeam} value={result.home} percent={result.homePercent} />
-            <BattleBar label={battle?.away_team ?? partnerConfig.awayTeam} value={result.away} percent={result.awayPercent} />
+            <BattleBar label={battle?.home_team ?? "Option A"} value={result.home} percent={result.homePercent} />
+            <BattleBar label={battle?.away_team ?? "Option B"} value={result.away} percent={result.awayPercent} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

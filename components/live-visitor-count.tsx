@@ -6,8 +6,10 @@ import { fetchActiveVisitorCount, getCurrentContext } from "@/lib/bubble-service
 import { removeBubbleRealtime, subscribeToBubbleRealtime } from "@/lib/realtime";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
-export function LiveVisitorCount() {
+export function LiveVisitorCount({ inverted = false }: { inverted?: boolean }) {
   const [count, setCount] = useState<number | null>(null);
+  const displayCount = count ?? 0;
+  const label = displayCount === 1 ? "Person" : "Personen";
 
   useEffect(() => {
     let mounted = true;
@@ -43,9 +45,9 @@ export function LiveVisitorCount() {
   }, []);
 
   return (
-    <div className="flex items-center gap-2 text-sm font-bold text-on-surface">
-      <UsersRound size={18} className="text-primary" />
-      {count ?? 42} Personen
+    <div className={["flex items-center gap-2 text-sm font-bold", inverted ? "text-white" : "text-on-surface"].join(" ")}>
+      <UsersRound size={18} className={inverted ? "text-white" : "text-primary"} />
+      {displayCount} {label}
     </div>
   );
 }

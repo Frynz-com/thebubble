@@ -21,6 +21,8 @@ export type Benefit = {
   image?: string;
   icon: LucideIcon;
   sponsor?: string;
+  code?: string;
+  hint?: string;
   variant?: "primary" | "secondary" | "tertiary";
 };
 
@@ -184,20 +186,29 @@ export const partnerConfig = {
 };
 
 export function getBubbleBranding(slug: string) {
+  if (slug === "demo") {
+    return {
+      partnerName: "The Bubble Demo",
+      eventName: "Matchday Demo",
+      heroImage: "/images/demo-stadium.jpg",
+      socialProof: "42 Personen sind gerade dabei",
+    };
+  }
+
   if (slug === "testbubble") {
     return {
       partnerName: "Test Bubble",
       eventName: "Internal Test",
-      heroImage: partnerConfig.images.hero,
+      heroImage: "",
       socialProof: "Test-Bubble ist bereit",
     };
   }
 
   return {
-    partnerName: "The Bubble Demo",
-    eventName: "Matchday Demo",
-    heroImage: "/images/demo-stadium.jpg",
-    socialProof: "42 Personen sind gerade dabei",
+    partnerName: "The Bubble",
+    eventName: "Live",
+    heroImage: "",
+    socialProof: "Live vor Ort",
   };
 }
 

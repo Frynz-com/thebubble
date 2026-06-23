@@ -5,8 +5,21 @@ export type BubbleRow = {
   slug: string;
   name: string;
   event_name: string;
+  type: string | null;
+  partner_name: string | null;
+  description: string | null;
+  logo_url: string | null;
+  hero_image_url: string | null;
+  primary_color: string | null;
+  accent_color: string | null;
+  reward_title: string | null;
+  reward_description: string | null;
+  reward_terms: string | null;
+  features: Json;
+  config: Json;
   is_active: boolean;
   created_at: string;
+  updated_at: string | null;
 };
 
 export type VisitorRow = {
@@ -29,7 +42,7 @@ export type PostRow = {
   visitor_id: string;
   content: string;
   created_at: string;
-  visitors?: Pick<VisitorRow, "nickname" | "avatar_url"> | null;
+  visitors?: Pick<VisitorRow, "nickname" | "avatar_url" | "is_guest"> | null;
 };
 
 export type PollRow = {
@@ -66,6 +79,30 @@ export type FanBattleEntryRow = {
   visitor_id: string;
   selected_team: "home" | "away";
   taps: number;
+  created_at: string;
+};
+
+export type AnalyticsEventType =
+  | "page_view"
+  | "enter_bubble"
+  | "anonymous_continue"
+  | "profile_create"
+  | "poll_vote"
+  | "community_post"
+  | "reward_view"
+  | "reward_claim"
+  | "sponsor_click"
+  | "module_click";
+
+export type AnalyticsEventRow = {
+  id: string;
+  bubble_id: string;
+  visitor_id: string | null;
+  session_id: string | null;
+  event_type: AnalyticsEventType;
+  path: string | null;
+  metadata: Json;
+  device_type: "mobile" | "tablet" | "desktop";
   created_at: string;
 };
 
@@ -106,6 +143,11 @@ export type Database = {
         Row: FanBattleEntryRow;
         Insert: Partial<FanBattleEntryRow> & Pick<FanBattleEntryRow, "fan_battle_id" | "visitor_id" | "selected_team" | "taps">;
         Update: Partial<FanBattleEntryRow>;
+      };
+      analytics_events: {
+        Row: AnalyticsEventRow;
+        Insert: Partial<AnalyticsEventRow> & Pick<AnalyticsEventRow, "bubble_id" | "event_type">;
+        Update: Partial<AnalyticsEventRow>;
       };
     };
     Functions: {

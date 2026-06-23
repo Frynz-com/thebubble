@@ -8,40 +8,38 @@ import {
   getCurrentContext,
   submitPollVote,
 } from "@/lib/bubble-service";
-import { partnerConfig } from "@/lib/partner-config";
+import { useBubbleConfig } from "@/lib/bubble-config";
+import { getCurrentBubbleSlug } from "@/lib/bubble-routing";
 import { removeBubbleRealtime, subscribeToBubbleRealtime } from "@/lib/realtime";
 import type { PollRow, PollVoteRow, VisitorRow } from "@/lib/supabase/types";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getVoteKey } from "@/lib/storage";
-
-const options = [
-  { id: "home", label: partnerConfig.homeTeam, percent: 48 },
-  { id: "draw", label: "Unentschieden", percent: 18 },
-  { id: "away", label: partnerConfig.awayTeam, percent: 34 },
-];
+import { trackBubbleEvent } from "@/lib/analytics";
 
 export function LiveVote() {
+  const bubbleSlug = getCurrentBubbleSlug();
+  const config = useBubbleConfig(bubbleSlug);
   const [selected, setSelected] = useState("");
   const [poll, setPoll] = useState<PollRow | null>(null);
   const [visitor, setVisitor] = useState<VisitorRow | null>(null);
   const [votes, setVotes] = useState<PollVoteRow[]>([]);
   const [message, setMessage] = useState("");
 
-  const activeOptions = poll?.options?.length ? poll.options : options.map(({ id, label }) => ({ key: id, label }));
+  const activeOptions = config.pollOptions.map((label, index) => ({ key: `option-${index}`, label }));
   const percentages = useMemo(() => {
     const total = Math.max(1, votes.length);
     return Object.fromEntries(activeOptions.map((option) => [option.key, Math.round((votes.filter((vote) => vote.option_key === option.key).length / total) * 100)]));
   }, [activeOptions, votes]);
 
   useEffect(() => {
-    const voteKey = getVoteKey();
+    const voteKey = getVoteKey(bubbleSlug);
     setSelected(window.localStorage.getItem(voteKey) ?? "");
     let mounted = true;
     let channel: RealtimeChannel | null = null;
 
     async function load() {
       try {
-        const context = await getCurrentContext();
+        const context = await getCurrentContext(bubbleSlug);
         if (!mounted || !context.bubble) {
           if (context.message) setMessage(context.message);
           return;
@@ -49,9 +47,9 @@ export function LiveVote() {
         if (context.message) setMessage(context.message);
         setVisitor(context.visitor ?? null);
         const activePoll = await fetchActivePoll(context.bubble.id);
-        if (!mounted || !activePoll) return;
-        setPoll(activePoll);
-        if (!channel) {
+        if (!mounted) return;
+        setPoll(activePoll ?? null);
+        if (activePoll && !channel) {
           channel = subscribeToBubbleRealtime({
             bubbleId: context.bubble.id,
             pollId: activePoll.id,
@@ -59,6 +57,7 @@ export function LiveVote() {
             onChange: () => void load(),
           });
         }
+        if (!activePoll) return;
         const pollVotes = await fetchPollVotes(activePoll.id);
         if (!mounted) return;
         setVotes(pollVotes);
@@ -75,7 +74,7 @@ export function LiveVote() {
       mounted = false;
       removeBubbleRealtime(channel);
     };
-  }, []);
+  }, [bubbleSlug]);
 
   async function choose(id: string) {
     if (poll && visitor) {
@@ -86,30 +85,32 @@ export function LiveVote() {
       }
     }
     setSelected(id);
-    window.localStorage.setItem(getVoteKey(), id);
+    window.localStorage.setItem(getVoteKey(bubbleSlug), id);
+    void trackBubbleEvent("poll_vote", { option: id, label: activeOptions.find((option) => option.key === id)?.label ?? id }, bubbleSlug);
   }
 
   return (
-    <section className="rounded-[1.5rem] bg-white p-5 shadow-ambient">
-      <h2 className="text-xl font-bold text-on-surface">Wer gewinnt heute?</h2>
+    <section className="rounded-[1.75rem] bg-white p-5 shadow-ambient">
+      <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-secondary">{config.actionBadge || "Live-Aktion"}</p>
+      <h2 className="text-2xl font-bold leading-8 text-on-surface">{config.pollQuestion || config.voteTitle}</h2>
+      {config.pollHint ? <p className="mt-2 text-sm leading-6 text-on-surface-variant">{config.pollHint}</p> : null}
       {message ? <p className="mt-2 rounded-[1rem] bg-surface-container-low p-3 text-sm font-semibold text-on-surface-variant">{message}</p> : null}
-      <div className="mt-4 space-y-3">
+      <div className="mt-5 space-y-3">
         {activeOptions.map((option) => {
           const active = selected === option.key;
-          const fallbackPercent = options.find((item) => item.id === option.key)?.percent ?? 0;
-          const percent = votes.length > 0 ? (percentages[option.key] ?? 0) : fallbackPercent;
+          const percent = votes.length > 0 ? (percentages[option.key] ?? 0) : 0;
           return (
             <button
               key={option.key}
               className={[
-                "w-full rounded-[1.25rem] border-2 p-3 text-left transition active:scale-[0.99]",
-                active ? "border-primary bg-surface-container-low" : "border-outline-variant/35 bg-white",
+                "w-full rounded-[1.35rem] border-2 p-4 text-left transition active:scale-[0.99]",
+                active ? "border-primary bg-primary/5" : "border-outline-variant/35 bg-white",
               ].join(" ")}
               type="button"
               onClick={() => choose(option.key)}
             >
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-bold text-on-surface">{option.label}</span>
+                <span className="text-base font-bold text-on-surface">{option.label}</span>
                 {active ? (
                   <span className="flex items-center gap-1 text-xs font-bold text-primary">
                     <Check size={15} />
@@ -129,6 +130,12 @@ export function LiveVote() {
           );
         })}
       </div>
+      {selected ? (
+        <div className="mt-5 rounded-[1.25rem] bg-primary/10 p-4 text-center">
+          <p className="text-base font-black text-primary">Du bist dabei!</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface-variant">Deine Stimme zählt.</p>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -1,7 +1,14 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { AppHeader } from "./app-header";
 import { BottomNav } from "./bottom-nav";
 import { PresenceHeartbeat } from "./presence-heartbeat";
+import { bubbleThemeStyle, useBubbleConfig } from "@/lib/bubble-config";
+import { getBubbleSlugFromPathname } from "@/lib/bubble-routing";
+import { trackBubbleEvent } from "@/lib/analytics";
 
 type MobilePageProps = {
   title: string;
@@ -10,8 +17,16 @@ type MobilePageProps = {
 };
 
 export function MobilePage({ title, subtitle, children }: MobilePageProps) {
+  const pathname = usePathname();
+  const bubbleSlug = getBubbleSlugFromPathname(pathname);
+  const config = useBubbleConfig(bubbleSlug);
+
+  useEffect(() => {
+    void trackBubbleEvent("page_view", { page: pathname }, bubbleSlug);
+  }, [bubbleSlug, pathname]);
+
   return (
-    <div className="min-h-svh bg-surface">
+    <div className="min-h-svh bg-surface" style={bubbleThemeStyle(config)}>
       <PresenceHeartbeat />
       <AppHeader />
       <main className="phone-shell safe-bottom px-4 pt-24">

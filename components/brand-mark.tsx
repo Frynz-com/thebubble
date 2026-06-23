@@ -1,28 +1,52 @@
-import { CircleDotDashed } from "lucide-react";
+/* eslint-disable @next/next/no-img-element */
+import { logoFrameClasses, logoImageClasses, logoImageStyle } from "@/lib/bubble-config";
+import type { LogoBackground, LogoFit, LogoShape, LogoSize } from "@/lib/bubble-config";
 
 type BrandMarkProps = {
   inverted?: boolean;
   partnerName?: string;
   subtitle?: string;
+  logoUrl?: string;
+  logoShape?: LogoShape;
+  logoFit?: LogoFit;
+  logoBackground?: LogoBackground;
+  logoSize?: LogoSize;
+  logoCropX?: number;
+  logoCropY?: number;
+  logoZoom?: number;
 };
 
-export function BrandMark({ inverted = false, partnerName = "The Bubble", subtitle }: BrandMarkProps) {
+export function BrandMark({
+  inverted = false,
+  partnerName = "The Bubble",
+  subtitle,
+  logoUrl,
+  logoShape = "round",
+  logoFit = "contain",
+  logoBackground = "transparent",
+  logoSize = "medium",
+  logoCropX = 0,
+  logoCropY = 0,
+  logoZoom = 100,
+}: BrandMarkProps) {
+  const logoConfig = { logoShape, logoFit, logoBackground, logoSize, logoCropX, logoCropY, logoZoom };
+  const initial = partnerName.trim().slice(0, 1).toUpperCase() || "B";
+
   return (
     <div className="flex items-center gap-3">
-      <div
-        className={[
-          "flex h-9 w-9 items-center justify-center rounded-xl border",
-          inverted ? "border-white/30 bg-white/20 text-white backdrop-blur-md" : "border-primary/10 bg-surface-container-low text-primary",
-        ].join(" ")}
-      >
-        <CircleDotDashed size={21} strokeWidth={2.4} />
+      <div className={logoFrameClasses(logoConfig, inverted)}>
+        {logoUrl ? (
+          <img src={logoUrl} alt="" className={logoImageClasses(logoConfig)} style={logoImageStyle(logoConfig)} />
+        ) : (
+          <span className="text-sm font-black leading-none">{initial}</span>
+        )}
       </div>
       <div className="min-w-0 leading-none">
         <p className={["truncate text-xl font-extrabold tracking-normal", inverted ? "text-white" : "text-primary"].join(" ")}>
           {partnerName}
         </p>
         {subtitle ? (
-          <p className={["mt-1 text-[10px] font-bold uppercase tracking-[0.18em]", inverted ? "text-white/70" : "text-on-surface-variant"].join(" ")}>
+          <p className={["mt-1 text-[11px] font-bold tracking-normal", inverted ? "text-white/70" : "text-on-surface-variant"].join(" ")}>
             {subtitle}
           </p>
         ) : null}

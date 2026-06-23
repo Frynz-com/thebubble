@@ -1,4 +1,3 @@
-import { partnerConfig } from "./partner-config";
 import { defaultBubbleSlug, getCurrentBubbleSlug, normalizeBubbleSlug } from "./bubble-routing";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "./supabase/browser";
 import { logSupabaseError } from "./supabase/log-error";
@@ -48,7 +47,7 @@ export async function getActiveBubble(slug?: string) {
 function profileFromVisitor(visitor: VisitorRow): BubbleProfile {
   return {
     name: visitor.nickname,
-    avatar: visitor.avatar_url ?? partnerConfig.images.user,
+    avatar: visitor.is_guest ? "" : (visitor.avatar_url ?? ""),
     isAnonymous: visitor.is_guest,
   };
 }
@@ -60,10 +59,9 @@ function storeVisitorState(visitor: VisitorRow, slug: string) {
 
 function createAnonymousProfile() {
   const number = Math.floor(1000 + Math.random() * 9000);
-  const avatar = partnerConfig.people[Math.floor(Math.random() * partnerConfig.people.length)]?.avatar ?? partnerConfig.images.user;
   return {
     name: `Gast ${number}`,
-    avatar,
+    avatar: "",
   };
 }
 
@@ -171,7 +169,7 @@ export async function ensureBubbleVisitor(slug?: string): Promise<BubbleContext>
       bubble_id: bubble.id,
       session_id: sessionId,
       nickname: anonymousProfile.name,
-      avatar_url: anonymousProfile.avatar,
+      avatar_url: null,
       is_guest: true,
       is_active: true,
       left_at: null,
@@ -226,7 +224,7 @@ export async function ensureProfileVisitor(profile: BubbleProfile, slug?: string
     bubble_id: bubble.id,
     session_id: sessionId,
     nickname: profile.name,
-    avatar_url: profile.avatar,
+    avatar_url: profile.avatar || null,
     is_guest: profile.isAnonymous,
     is_active: true,
     left_at: null,
@@ -372,7 +370,7 @@ export async function fetchPosts(bubbleId: string) {
 
   const { data, error } = await supabase
     .from("posts")
-    .select("id,bubble_id,visitor_id,content,created_at,visitors(nickname,avatar_url)")
+    .select("id,bubble_id,visitor_id,content,created_at,visitors(nickname,avatar_url,is_guest)")
     .eq("bubble_id", bubbleId)
     .order("created_at", { ascending: false })
     .limit(30);
@@ -380,7 +378,7 @@ export async function fetchPosts(bubbleId: string) {
     logSupabaseError("fetchPosts", error);
     throw error;
   }
-  return ((data ?? []) as Array<Omit<PostRow, "visitors"> & { visitors?: Array<Pick<VisitorRow, "nickname" | "avatar_url">> | Pick<VisitorRow, "nickname" | "avatar_url"> | null }>).map((row) => ({
+  return ((data ?? []) as Array<Omit<PostRow, "visitors"> & { visitors?: Array<Pick<VisitorRow, "nickname" | "avatar_url" | "is_guest">> | Pick<VisitorRow, "nickname" | "avatar_url" | "is_guest"> | null }>).map((row) => ({
     ...row,
     visitors: Array.isArray(row.visitors) ? (row.visitors[0] ?? null) : (row.visitors ?? null),
   }));
@@ -406,7 +404,7 @@ export function mapPost(row: PostRow): PostView {
   return {
     id: row.id,
     author: row.visitors?.nickname ?? "Bubble Gast",
-    avatar: row.visitors?.avatar_url ?? partnerConfig.images.user,
+    avatar: row.visitors?.is_guest ? "" : (row.visitors?.avatar_url ?? ""),
     text: row.content,
     time: formatTime(row.created_at),
   };

@@ -1,20 +1,19 @@
 "use client";
 
-import Image from "next/image";
 import { ImageUp, LogOut, Pencil, UserRound, X } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
+import { AvatarCircle } from "@/components/avatar-circle";
 import { ensureProfileVisitor, getStoredVisitor, leaveVisitor } from "@/lib/bubble-service";
 import { uploadVisitorAvatar } from "@/lib/avatar-service";
 import { bubblePath, getBubbleSlugFromPathname } from "@/lib/bubble-routing";
-import { partnerConfig } from "@/lib/partner-config";
 import { BubbleProfile, clearStoredProfile, getStoredProfile, getStoredVisitorId, setStoredProfile } from "@/lib/storage";
 
 function defaultProfile(): BubbleProfile {
   return {
     name: "Bubble Gast",
-    avatar: partnerConfig.images.user,
+    avatar: "",
     isAnonymous: true,
   };
 }
@@ -27,7 +26,7 @@ export function ProfileSheet() {
   const [editing, setEditing] = useState(false);
   const [profile, setProfile] = useState<BubbleProfile>(defaultProfile);
   const [name, setName] = useState("");
-  const [avatar, setAvatar] = useState(partnerConfig.images.user);
+  const [avatar, setAvatar] = useState("");
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
@@ -47,7 +46,7 @@ export function ProfileSheet() {
         if (!visitor) return;
         const nextProfile = {
           name: visitor.nickname,
-          avatar: visitor.avatar_url ?? partnerConfig.images.user,
+          avatar: visitor.is_guest ? "" : (visitor.avatar_url ?? ""),
           isAnonymous: visitor.is_guest,
         };
         setStoredProfile(nextProfile, slug);
@@ -142,8 +141,6 @@ export function ProfileSheet() {
     setAvatar(profile.avatar);
   }
 
-  const avatarChoices = Array.from(new Set([partnerConfig.images.user, partnerConfig.images.onboarding, ...partnerConfig.people.slice(0, 3).map((person) => person.avatar)]));
-
   const sheet = (
     <div className="fixed inset-0 z-[100] flex items-end bg-on-surface/30 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm" role="dialog" aria-modal="true">
       <button className="absolute inset-0 h-full w-full cursor-default" aria-label="Profil schließen" type="button" onClick={closeSheet} />
@@ -156,9 +153,7 @@ export function ProfileSheet() {
         </div>
 
         <div className="mb-5 flex items-center gap-4">
-          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-surface-container-high">
-            <Image src={profile.avatar} alt="" fill sizes="64px" className="rounded-full object-cover object-center" />
-          </div>
+          <AvatarCircle src={profile.avatar} name={profile.name} size="lg" fallback="user" />
           <div className="min-w-0">
             <h2 className="truncate text-xl font-bold leading-7 text-on-surface">{profile.name}</h2>
             <p className="text-sm font-semibold text-on-surface-variant">{profile.isAnonymous ? "Anonym in der Bubble" : "Profil aktiv"}</p>
@@ -180,21 +175,12 @@ export function ProfileSheet() {
 
             <div>
               <p className="mb-3 text-sm font-bold text-on-surface">Profilbild</p>
-              <div className="grid grid-cols-5 gap-3">
-                {avatarChoices.map((imageUrl) => (
-                  <button
-                    key={imageUrl}
-                    className={[
-                      "relative h-12 w-12 overflow-hidden rounded-full border-2 bg-surface-container-high",
-                      avatar === imageUrl ? "border-primary" : "border-transparent",
-                    ].join(" ")}
-                    type="button"
-                    onClick={() => setAvatar(imageUrl)}
-                    aria-label="Profilbild wählen"
-                  >
-                    <Image src={imageUrl} alt="" fill sizes="48px" className="rounded-full object-cover object-center" />
-                  </button>
-                ))}
+              <div className="flex items-center gap-3 rounded-[1.25rem] bg-surface p-3">
+                <AvatarCircle src={avatar} name={name} size="md" fallback="user" />
+                <div>
+                  <p className="text-sm font-bold text-on-surface">{avatar ? "Eigenes Profilbild" : "Neutraler Avatar"}</p>
+                  <p className="text-xs font-semibold text-on-surface-variant">Optional, rund und mittig dargestellt.</p>
+                </div>
               </div>
               <label className="mt-4 flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full border-2 border-dashed border-outline-variant bg-surface text-sm font-bold text-primary transition active:scale-95">
                 <ImageUp size={18} />
@@ -242,7 +228,7 @@ export function ProfileSheet() {
         type="button"
         onClick={() => setOpen(true)}
       >
-        <Image src={profile.avatar} alt="Profil" fill sizes="40px" className="rounded-full object-cover object-center" />
+        <AvatarCircle src={profile.avatar} name={profile.name} size="sm" fallback="user" />
       </button>
 
       {mounted && open ? createPortal(sheet, document.body) : null}

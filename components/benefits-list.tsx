@@ -1,22 +1,62 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useState } from "react";
+import { Gift } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { Benefit } from "@/lib/partner-config";
-import { partnerConfig } from "@/lib/partner-config";
 import { getBubbleSlugFromPathname } from "@/lib/bubble-routing";
+import { useBubbleConfig } from "@/lib/bubble-config";
+import { trackBubbleEvent } from "@/lib/analytics";
 import { BenefitCard } from "./cards";
 
 export function BenefitsList() {
   const [selectedBenefit, setSelectedBenefit] = useState<Benefit | null>(null);
   const bubbleSlug = getBubbleSlugFromPathname(usePathname());
+  const config = useBubbleConfig(bubbleSlug);
+  const benefits: Benefit[] = useMemo(
+    () =>
+      config.features.rewards
+        ? config.rewards.map((reward) => ({
+            id: reward.id,
+            title: reward.title,
+            description: reward.description || "Mach mit und sichere dir Vorteile vor Ort.",
+            meta: reward.hint || reward.code || config.type,
+            action: reward.buttonText || "Einlösen",
+            tag: "Vorteil",
+            code: reward.code,
+            hint: reward.hint,
+            icon: Gift,
+          }))
+        : [],
+    [config.features.rewards, config.rewards, config.type],
+  );
+
+  useEffect(() => {
+    if (benefits.length > 0) void trackBubbleEvent("reward_view", { rewards: benefits.map((benefit) => benefit.title) }, bubbleSlug);
+  }, [benefits, bubbleSlug]);
+
+  if (!config.features.rewards) {
+    return <p className="rounded-[1.5rem] bg-white p-5 text-sm font-semibold text-on-surface-variant shadow-ambient">Vorteile sind für diese Bubble nicht aktiv.</p>;
+  }
+
+  if (benefits.length === 0) {
+    return <p className="rounded-[1.5rem] bg-white p-5 text-sm font-semibold text-on-surface-variant shadow-ambient">Für diese Bubble ist aktuell kein Vorteil hinterlegt.</p>;
+  }
 
   return (
     <>
       <div className="space-y-5">
-        {partnerConfig.benefits.map((benefit) => (
-          <BenefitCard key={benefit.id} benefit={benefit} onRedeem={setSelectedBenefit} bubbleSlug={bubbleSlug} />
+        {benefits.map((benefit) => (
+          <BenefitCard
+            key={benefit.id}
+            benefit={benefit}
+            onRedeem={(selected) => {
+              setSelectedBenefit(selected);
+              void trackBubbleEvent("reward_claim", { reward: selected.title, code: selected.code ?? config.rewardCode }, bubbleSlug);
+            }}
+            bubbleSlug={bubbleSlug}
+          />
         ))}
       </div>
 
@@ -35,7 +75,7 @@ export function BenefitsList() {
             </div>
             <div className="rounded-[1.5rem] bg-surface-container-low p-5 text-center">
               <p className="text-sm font-semibold text-on-surface-variant">Zeige diesen Bildschirm dem Personal</p>
-              <p className="mt-4 text-4xl font-extrabold tracking-[0.08em] text-primary">BUBBLE-24</p>
+              <p className="mt-4 text-4xl font-extrabold tracking-[0.08em] text-primary">{selectedBenefit.code || config.rewardCode}</p>
             </div>
             <button className="mt-5 min-h-14 w-full rounded-full bg-primary text-sm font-bold text-on-primary shadow-active" type="button" onClick={() => setSelectedBenefit(null)}>
               Schließen

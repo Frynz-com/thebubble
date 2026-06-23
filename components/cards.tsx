@@ -4,6 +4,7 @@ import { Calendar, Ticket, UsersRound } from "lucide-react";
 import type { Benefit, Challenge, Post } from "@/lib/partner-config";
 import { fallbackBenefitIcon } from "@/lib/partner-config";
 import { bubblePath, defaultBubbleSlug } from "@/lib/bubble-routing";
+import { AvatarCircle } from "./avatar-circle";
 import { ChallengeAction } from "./challenge-action";
 import { LiveChip } from "./live-chip";
 
@@ -104,9 +105,7 @@ export function PostCard({ post }: { post: Post }) {
     <article className="space-y-3 rounded-[1.5rem] bg-white p-4 shadow-ambient">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="relative h-10 w-10 overflow-hidden rounded-full bg-surface-container-high">
-            <Image src={post.avatar} alt={post.author} fill sizes="40px" className="rounded-full object-cover object-center" />
-          </div>
+          <AvatarCircle src={post.avatar} name={post.author} size="sm" fallback="initial" />
           <div>
             <p className="text-sm font-bold text-on-surface">{post.author}</p>
             <p className="text-xs font-semibold text-on-surface-variant">{post.time}</p>

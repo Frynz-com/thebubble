@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { Send, X } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import type { BubblePerson, Post } from "@/lib/partner-config";
 import { partnerConfig } from "@/lib/partner-config";
+import { AvatarCircle } from "@/components/avatar-circle";
 import {
   createPost,
   fetchActiveVisitors,
@@ -12,6 +12,9 @@ import {
   getCurrentContext,
   mapPost,
 } from "@/lib/bubble-service";
+import { useBubbleConfig } from "@/lib/bubble-config";
+import { getCurrentBubbleSlug } from "@/lib/bubble-routing";
+import { trackBubbleEvent } from "@/lib/analytics";
 import { removeBubbleRealtime, subscribeToBubbleRealtime } from "@/lib/realtime";
 import type { BubbleRow, VisitorRow } from "@/lib/supabase/types";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -19,6 +22,8 @@ import { BubblePost, getStoredPosts, getStoredProfile, setStoredPosts } from "@/
 import { PostCard } from "./cards";
 
 export function CommunityBoard() {
+  const bubbleSlug = getCurrentBubbleSlug();
+  const config = useBubbleConfig(bubbleSlug);
   const [text, setText] = useState("");
   const [localPosts, setLocalPosts] = useState<BubblePost[]>([]);
   const [remotePosts, setRemotePosts] = useState<Post[]>([]);
@@ -29,13 +34,13 @@ export function CommunityBoard() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    setLocalPosts(getStoredPosts());
+    setLocalPosts(getStoredPosts(bubbleSlug));
     let mounted = true;
     let channel: RealtimeChannel | null = null;
 
     async function load() {
       try {
-        const context = await getCurrentContext();
+        const context = await getCurrentContext(bubbleSlug);
         if (!mounted) return;
         if (context.message) setMessage(context.message);
         if (!context.bubble) return;
@@ -66,19 +71,21 @@ export function CommunityBoard() {
       window.clearInterval(interval);
       removeBubbleRealtime(channel);
     };
-  }, []);
+  }, [bubbleSlug]);
 
   const people: BubblePerson[] =
     activeVisitors.length > 0
       ? activeVisitors.slice(0, 8).map((item) => ({
           id: item.id,
           name: item.nickname,
-          avatar: item.avatar_url ?? partnerConfig.images.user,
+          avatar: item.is_guest ? "" : (item.avatar_url ?? ""),
           active: true,
         }))
-      : partnerConfig.people;
+      : bubbleSlug === "demo"
+        ? partnerConfig.people
+        : [];
 
-  const headlineCount = activeVisitors.length > 0 ? activeVisitors.length : 42;
+  const headlineCount = activeVisitors.length;
 
   async function submitPost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,6 +95,7 @@ export function CommunityBoard() {
     if (bubble && visitor) {
       try {
         await createPost(bubble.id, visitor.id, cleanText.slice(0, 180));
+        void trackBubbleEvent("community_post", { length: cleanText.length }, bubbleSlug);
         setText("");
         const posts = await fetchPosts(bubble.id);
         setRemotePosts(posts.map(mapPost));
@@ -98,50 +106,58 @@ export function CommunityBoard() {
       }
     }
 
-    const profile = getStoredProfile();
+    const profile = getStoredProfile(bubbleSlug);
     const nextPost: BubblePost = {
       id: `${Date.now()}`,
       author: profile?.name ?? "Bubble Gast",
-      avatar: profile?.avatar ?? partnerConfig.images.user,
+      avatar: profile?.avatar ?? "",
       text: cleanText.slice(0, 180),
       time: "gerade eben",
     };
 
     const nextPosts = [nextPost, ...localPosts].slice(0, 12);
     setLocalPosts(nextPosts);
-    setStoredPosts(nextPosts);
+    setStoredPosts(nextPosts, bubbleSlug);
+    void trackBubbleEvent("community_post", { length: cleanText.length, local: true }, bubbleSlug);
     setText("");
   }
 
-  const demoPosts: Post[] = partnerConfig.posts;
+  const demoPosts: Post[] = bubbleSlug === "demo" ? partnerConfig.posts : [];
   const visiblePosts = remotePosts.length > 0 ? remotePosts : [...localPosts, ...demoPosts];
+
+  if (!config.features.community) {
+    return <p className="rounded-[1.5rem] bg-white p-5 text-sm font-semibold text-on-surface-variant shadow-ambient">Community ist für diese Bubble nicht aktiv.</p>;
+  }
 
   return (
     <div className="space-y-5">
       {message ? <p className="rounded-[1.25rem] bg-white p-4 text-sm font-semibold text-on-surface-variant shadow-ambient">{message}</p> : null}
-      <section className="rounded-[1.5rem] bg-white p-5 shadow-ambient">
-        <h2 className="text-xl font-bold text-on-surface">{headlineCount} Personen sind gerade in dieser Bubble</h2>
-        <div className="mt-5 grid grid-cols-5 gap-3">
-          {people.map((person) => (
-            <button key={person.id} className="min-w-0 text-center" type="button" onClick={() => setSelectedPerson(person)}>
-              <span className="relative mx-auto block h-12 w-12 overflow-hidden rounded-full bg-surface-container-high">
-                <Image src={person.avatar} alt="" fill sizes="48px" className="rounded-full object-cover object-center" />
-              </span>
-              <span className="mt-2 block truncate text-xs font-bold text-on-surface">{person.name}</span>
-              {person.active ? <span className="block text-[10px] font-bold text-secondary">gerade aktiv</span> : null}
-            </button>
-          ))}
-        </div>
-      </section>
+      {config.features.peopleHere ? (
+        <section className="rounded-[1.5rem] bg-white p-5 shadow-ambient">
+          <h2 className="text-xl font-bold text-on-surface">{headlineCount} Personen sind gerade in dieser Bubble</h2>
+          {people.length > 0 ? (
+            <div className="mt-5 grid grid-cols-5 gap-3">
+              {people.map((person) => (
+                <button key={person.id} className="min-w-0 text-center" type="button" onClick={() => setSelectedPerson(person)}>
+                  <AvatarCircle src={person.avatar} name={person.name} size="md" fallback="initial" className="mx-auto" />
+                  <span className="mt-2 block truncate text-xs font-bold text-on-surface">{person.name}</span>
+                  {person.active ? <span className="block text-[10px] font-bold text-secondary">gerade aktiv</span> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="rounded-[1.5rem] bg-white p-4 shadow-ambient">
         <form className="space-y-3" onSubmit={submitPost}>
+          {config.communityRules ? <p className="rounded-[1rem] bg-surface-container-low p-3 text-sm font-semibold leading-5 text-on-surface-variant">{config.communityRules}</p> : null}
           <label className="block">
             <span className="sr-only">Beitrag</span>
             <textarea
               value={text}
               onChange={(event) => setText(event.target.value)}
-              placeholder="Schreib etwas in die Bubble ..."
+              placeholder={config.communityPlaceholder}
               className="min-h-24 w-full resize-none rounded-[1.25rem] border-2 border-outline-variant/35 bg-surface p-4 text-base leading-6 text-on-surface outline-none placeholder:text-outline focus:border-primary"
               maxLength={180}
             />
@@ -155,9 +171,7 @@ export function CommunityBoard() {
 
       <section className="space-y-4">
         <h2 className="text-xl font-bold text-on-surface">Community-Beiträge</h2>
-        {visiblePosts.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
+        {visiblePosts.length > 0 ? visiblePosts.map((post) => <PostCard key={post.id} post={post} />) : <p className="rounded-[1.5rem] bg-white p-5 text-sm font-semibold text-on-surface-variant shadow-ambient">Noch keine Beiträge in dieser Bubble.</p>}
       </section>
 
       {selectedPerson ? (
@@ -167,9 +181,7 @@ export function CommunityBoard() {
             <button className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-low text-on-surface" type="button" aria-label="Schließen" onClick={() => setSelectedPerson(null)}>
               <X size={18} />
             </button>
-            <div className="relative mx-auto h-24 w-24 overflow-hidden rounded-full bg-surface-container-high">
-              <Image src={selectedPerson.avatar} alt="" fill sizes="96px" className="rounded-full object-cover object-center" />
-            </div>
+            <AvatarCircle src={selectedPerson.avatar} name={selectedPerson.name} size="xl" fallback="initial" className="mx-auto h-24 w-24" />
             <h3 className="mt-4 text-2xl font-bold text-on-surface">{selectedPerson.name}</h3>
             <p className="mt-1 text-sm font-bold text-secondary">Gerade hier</p>
           </section>
