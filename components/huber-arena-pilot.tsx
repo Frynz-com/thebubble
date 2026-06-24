@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Gift, MessageCircle, Pencil, Ticket, X } from "lucide-react";
+import { Check, Gift, MessageCircle, Ticket, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { FormEvent, useEffect, useState } from "react";
 import { MobilePage } from "@/components/mobile-page";
@@ -161,10 +161,6 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
             outcomePick={outcomePick}
             exactScoreText={exactScoreText}
             hasContact={Boolean(contactValue.trim())}
-            onEdit={() => {
-              setSaved(false);
-              setMessage("");
-            }}
           />
         ) : (
           <section className="rounded-[1.35rem] bg-white p-4 shadow-ambient">
@@ -280,13 +276,11 @@ function SuccessCard({
   outcomePick,
   exactScoreText,
   hasContact,
-  onEdit,
 }: {
   bubbleSlug: string;
   outcomePick: MatchOutcome | "";
   exactScoreText: string;
   hasContact: boolean;
-  onEdit: () => void;
 }) {
   return (
     <section className="rounded-[1.35rem] bg-white p-4 shadow-ambient">
@@ -318,10 +312,6 @@ function SuccessCard({
         </div>
       </dl>
       <div className="mt-4 grid gap-2">
-        <button className="flex min-h-12 items-center justify-center gap-2 rounded-full border-2 border-outline-variant bg-white px-4 text-sm font-black text-primary" type="button" onClick={onEdit}>
-          <Pencil size={17} />
-          Tipp ändern
-        </button>
         <Link className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-black text-on-primary" href={bubblePath(bubbleSlug, "/community")}>
           <MessageCircle size={17} />
           Zum Community-Chat

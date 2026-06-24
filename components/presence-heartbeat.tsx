@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { getCurrentContext, touchVisitor } from "@/lib/bubble-service";
+import { ensureBubbleVisitor, touchVisitor } from "@/lib/bubble-service";
 import { getCurrentBubbleSlug } from "@/lib/bubble-routing";
 
 export function PresenceHeartbeat() {
@@ -12,10 +12,9 @@ export function PresenceHeartbeat() {
 
     async function refresh() {
       try {
-        const context = await getCurrentContext(bubbleSlug);
+        const context = await ensureBubbleVisitor(bubbleSlug);
         if (!active) return;
         visitorId = context.visitor?.id ?? "";
-        if (visitorId) await touchVisitor(visitorId, bubbleSlug);
       } catch {
         // Presence must never block the MVP flow.
       }

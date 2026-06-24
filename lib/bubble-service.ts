@@ -5,6 +5,7 @@ import type { BubbleRow, FanBattleRow, PollRow, PollVoteRow, PostRow, VisitorRow
 import { BubbleProfile, createGuestProfile, getOrCreateSessionId, getStoredVisitorId, setStoredProfile, setStoredVisitorSession } from "./storage";
 
 export const demoBubbleSlug = defaultBubbleSlug;
+const activeVisitorWindowMs = 5 * 60 * 1000;
 
 export type BubbleStatus = "offline" | "ready" | "error";
 
@@ -72,6 +73,19 @@ function createAnonymousProfile() {
     name: `Gast ${number}`,
     avatar: "",
   };
+}
+
+function activeSinceIso() {
+  return new Date(Date.now() - activeVisitorWindowMs).toISOString();
+}
+
+function dedupeVisitorsBySession(visitors: VisitorRow[]) {
+  const unique = new Map<string, VisitorRow>();
+  for (const visitor of visitors) {
+    const key = visitor.session_id || visitor.id;
+    if (!unique.has(key)) unique.set(key, visitor);
+  }
+  return Array.from(unique.values());
 }
 
 async function activateVisitor(visitor: VisitorRow, slug: string) {
@@ -150,7 +164,13 @@ export async function ensureBubbleVisitor(slug?: string): Promise<BubbleContext>
     });
   }
 
-  const { data: existingVisitor, error: existingError } = await supabase.from("visitors").select("*").eq("bubble_id", bubble.id).eq("session_id", sessionId).maybeSingle();
+  const { data: existingVisitors, error: existingError } = await supabase
+    .from("visitors")
+    .select("*")
+    .eq("bubble_id", bubble.id)
+    .eq("session_id", sessionId)
+    .order("last_seen_at", { ascending: false })
+    .limit(1);
   if (existingError) {
     console.error("[visitor] session visitor lookup failed", {
       slug: activeSlug,
@@ -165,8 +185,9 @@ export async function ensureBubbleVisitor(slug?: string): Promise<BubbleContext>
     throw existingError;
   }
 
+  const existingVisitor = existingVisitors?.[0] as VisitorRow | undefined;
   if (existingVisitor) {
-    const visitor = await activateVisitor(existingVisitor as VisitorRow, activeSlug);
+    const visitor = await activateVisitor(existingVisitor, activeSlug);
     return { status: "ready", bubble, visitor } satisfies BubbleContext;
   }
 
@@ -174,7 +195,7 @@ export async function ensureBubbleVisitor(slug?: string): Promise<BubbleContext>
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("visitors")
-    .insert({
+    .upsert({
       bubble_id: bubble.id,
       session_id: sessionId,
       nickname: anonymousProfile.name,
@@ -184,11 +205,26 @@ export async function ensureBubbleVisitor(slug?: string): Promise<BubbleContext>
       left_at: null,
       joined_at: now,
       last_seen_at: now,
-    })
+    }, { onConflict: "bubble_id,session_id" })
     .select("*")
     .single();
 
   if (error) {
+    if (error.code === "23505" || error.message.toLowerCase().includes("duplicate")) {
+      const { data: conflictVisitors, error: conflictError } = await supabase
+        .from("visitors")
+        .select("*")
+        .eq("bubble_id", bubble.id)
+        .eq("session_id", sessionId)
+        .order("last_seen_at", { ascending: false })
+        .limit(1);
+      if (conflictError) throw conflictError;
+      const conflictVisitor = conflictVisitors?.[0] as VisitorRow | undefined;
+      if (conflictVisitor) {
+        const visitor = await activateVisitor(conflictVisitor, activeSlug);
+        return { status: "ready", bubble, visitor } satisfies BubbleContext;
+      }
+    }
     console.error("[visitor] insert failed", {
       slug: activeSlug,
       bubbleId: bubble.id,
@@ -340,37 +376,40 @@ export async function fetchActiveVisitors(bubbleId: string) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return [];
 
-  const activeSince = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const activeSince = activeSinceIso();
   const { data, error } = await supabase
     .from("visitors")
     .select("*")
     .eq("bubble_id", bubbleId)
     .eq("is_active", true)
     .gte("last_seen_at", activeSince)
-    .order("last_seen_at", { ascending: false });
+    .order("last_seen_at", { ascending: false })
+    .limit(200);
   if (error) {
     logSupabaseError("fetchActiveVisitors", error);
     throw error;
   }
-  return (data ?? []) as VisitorRow[];
+  return dedupeVisitorsBySession((data ?? []) as VisitorRow[]);
 }
 
 export async function fetchActiveVisitorCount(bubbleId: string) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return 0;
 
-  const activeSince = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  const { count, error } = await supabase
+  const activeSince = activeSinceIso();
+  const { data, error } = await supabase
     .from("visitors")
-    .select("id", { count: "exact", head: true })
+    .select("id,session_id,last_seen_at")
     .eq("bubble_id", bubbleId)
     .eq("is_active", true)
-    .gte("last_seen_at", activeSince);
+    .gte("last_seen_at", activeSince)
+    .order("last_seen_at", { ascending: false })
+    .limit(2000);
   if (error) {
     logSupabaseError("fetchActiveVisitorCount", error);
     throw error;
   }
-  return count ?? 0;
+  return new Set(((data ?? []) as Pick<VisitorRow, "id" | "session_id">[]).map((visitor) => visitor.session_id || visitor.id)).size;
 }
 
 export async function fetchPosts(bubbleId: string) {

@@ -17,6 +17,18 @@ function isMissingTable(error: { code?: string; message?: string; details?: stri
   return text.includes("schema cache") || text.includes("does not exist") || text.includes("not find") || text.includes("pgrst205");
 }
 
+async function getExistingPrediction(supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>, bubbleId: string, visitorId: string) {
+  const { data, error } = await supabase
+    .from("match_predictions")
+    .select("*")
+    .eq("bubble_id", bubbleId)
+    .eq("visitor_id", visitorId)
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (error) throw error;
+  return (data?.[0] as MatchPredictionRow | undefined) ?? null;
+}
+
 async function getBubbleAndVisitor(bubbleSlug: string, visitorId: string, sessionId: string) {
   const supabase = getSupabaseAdminClient();
   if (!supabase) throw new Error("Supabase Admin Client ist nicht konfiguriert.");
@@ -75,7 +87,7 @@ export async function GET(request: NextRequest) {
 
     const [matchStateResult, predictionResult] = await Promise.all([
       ensureMatchState(supabase, bubble.id),
-      supabase.from("match_predictions").select("*").eq("bubble_id", bubble.id).eq("visitor_id", visitor.id).maybeSingle(),
+      supabase.from("match_predictions").select("*").eq("bubble_id", bubble.id).eq("visitor_id", visitor.id).order("created_at", { ascending: true }).limit(1),
     ]);
 
     if (predictionResult.error) throw predictionResult.error;
@@ -84,7 +96,7 @@ export async function GET(request: NextRequest) {
       bubble,
       visitor,
       matchState: matchStateResult,
-      prediction: (predictionResult.data as MatchPredictionRow | null) ?? null,
+      prediction: ((predictionResult.data?.[0] as MatchPredictionRow | undefined) ?? null),
     });
   } catch (error) {
     const typedError = error as { code?: string; message?: string; details?: string; hint?: string };
@@ -116,6 +128,9 @@ export async function POST(request: NextRequest) {
     const { supabase, bubble, visitor } = await getBubbleAndVisitor(bubbleSlug, visitorId, sessionId);
     if (!bubble || !visitor) return jsonResponse({ error: "Besucher wurde nicht gefunden." }, 404);
 
+    const existingPrediction = await getExistingPrediction(supabase, bubble.id, visitor.id);
+    if (existingPrediction) return jsonResponse({ prediction: existingPrediction, locked: true });
+
     const parsed = parseExactScoreText(exactScoreText);
     const now = new Date().toISOString();
     const predictionPayload = {
@@ -129,16 +144,23 @@ export async function POST(request: NextRequest) {
       ecuador_score: parsed.ecuadorScore,
       parsed_outcome: parsed.parsedOutcome,
       parse_status: parsed.parseStatus,
+      created_at: now,
       updated_at: now,
     };
 
     const { data, error } = await supabase
       .from("match_predictions")
-      .upsert(predictionPayload, { onConflict: "bubble_id,visitor_id" })
+      .insert(predictionPayload)
       .select("*")
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === "23505" || error.message.toLowerCase().includes("duplicate")) {
+        const prediction = await getExistingPrediction(supabase, bubble.id, visitor.id);
+        if (prediction) return jsonResponse({ prediction, locked: true });
+      }
+      throw error;
+    }
 
     if (displayName && displayName !== visitor.nickname) {
       await supabase

@@ -15,14 +15,13 @@ import {
 import { useBubbleConfig } from "@/lib/bubble-config";
 import { getCurrentBubbleSlug } from "@/lib/bubble-routing";
 import { trackBubbleEvent } from "@/lib/analytics";
-import { removeBubbleRealtime, subscribeToBubbleRealtime } from "@/lib/realtime";
 import type { BubbleRow, VisitorRow } from "@/lib/supabase/types";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { BubblePost, getStoredPosts, getStoredProfile, setStoredPosts } from "@/lib/storage";
 import { PostCard } from "./cards";
 
 export function CommunityBoard() {
   const bubbleSlug = getCurrentBubbleSlug();
+  const isDemoBubble = bubbleSlug === "demo";
   const config = useBubbleConfig(bubbleSlug);
   const [text, setText] = useState("");
   const [localPosts, setLocalPosts] = useState<BubblePost[]>([]);
@@ -34,64 +33,80 @@ export function CommunityBoard() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    setLocalPosts(getStoredPosts(bubbleSlug));
+    setLocalPosts(isDemoBubble ? getStoredPosts(bubbleSlug) : []);
     let mounted = true;
-    let channel: RealtimeChannel | null = null;
+    let currentBubbleId = "";
 
-    async function load() {
+    async function refreshData(bubbleId: string) {
+      const [visitors, posts] = await Promise.all([fetchActiveVisitors(bubbleId), fetchPosts(bubbleId)]);
+      if (!mounted) return;
+      setActiveVisitors(visitors);
+      setRemotePosts(posts.map(mapPost));
+      setMessage("");
+    }
+
+    async function loadInitial() {
       try {
         const context = await getCurrentContext(bubbleSlug);
         if (!mounted) return;
-        if (context.message) setMessage(context.message);
+        if (context.message && isDemoBubble) setMessage(context.message);
         if (!context.bubble) return;
 
         setBubble(context.bubble);
         setVisitor(context.visitor ?? null);
-        const [visitors, posts] = await Promise.all([fetchActiveVisitors(context.bubble.id), fetchPosts(context.bubble.id)]);
-        if (!mounted) return;
-        setActiveVisitors(visitors);
-        setRemotePosts(posts.map(mapPost));
-        if (!channel) {
-          channel = subscribeToBubbleRealtime({
-            bubbleId: context.bubble.id,
-            channelName: `bubble-community-${context.bubble.id}`,
-            onChange: () => void load(),
-          });
-        }
+        currentBubbleId = context.bubble.id;
+        await refreshData(context.bubble.id);
       } catch {
-        if (mounted) setMessage("Verbindung fehlgeschlagen. Lokale Demo-Beiträge bleiben sichtbar.");
+        if (mounted) setMessage(isDemoBubble ? "Demo-Verbindung unterbrochen. Lokale Demo-Beiträge bleiben sichtbar." : "Verbindung kurz unterbrochen. Beiträge werden erneut geladen.");
       }
     }
 
-    load();
-    const interval = window.setInterval(() => void load(), 45_000);
+    async function poll() {
+      try {
+        if (currentBubbleId) await refreshData(currentBubbleId);
+        else await loadInitial();
+      } catch {
+        if (mounted) setMessage(isDemoBubble ? "Demo-Verbindung unterbrochen. Lokale Demo-Beiträge bleiben sichtbar." : "Verbindung kurz unterbrochen. Beiträge werden erneut geladen.");
+      }
+    }
+
+    void loadInitial();
+    const interval = window.setInterval(() => void poll(), 15_000);
 
     return () => {
       mounted = false;
       window.clearInterval(interval);
-      removeBubbleRealtime(channel);
     };
-  }, [bubbleSlug]);
+  }, [bubbleSlug, isDemoBubble]);
 
-  const people: BubblePerson[] =
+  const peopleAll: BubblePerson[] =
     activeVisitors.length > 0
-      ? activeVisitors.slice(0, 8).map((item) => ({
+      ? activeVisitors.map((item) => ({
           id: item.id,
           name: item.nickname,
           avatar: item.is_guest ? "" : (item.avatar_url ?? ""),
           active: true,
         }))
-      : bubbleSlug === "demo"
+      : isDemoBubble
         ? partnerConfig.people
         : [];
 
-  const headlineCount = activeVisitors.length;
+  const visiblePeople = peopleAll.slice(0, 6);
+  const additionalPeople = Math.max(0, peopleAll.length - visiblePeople.length);
+  const headlineCount = peopleAll.length;
   const headlineLabel = headlineCount === 1 ? "Person ist" : "Personen sind";
 
   async function submitPost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanText = text.trim();
     if (!cleanText) return;
+
+    if (!bubble || !visitor) {
+      if (!isDemoBubble) {
+        setMessage("Verbindung wird hergestellt. Bitte gleich erneut posten.");
+        return;
+      }
+    }
 
     if (bubble && visitor) {
       try {
@@ -100,9 +115,10 @@ export function CommunityBoard() {
         setText("");
         const posts = await fetchPosts(bubble.id);
         setRemotePosts(posts.map(mapPost));
+        setMessage("");
         return;
       } catch {
-        setMessage("Beitrag konnte nicht gespeichert werden.");
+        setMessage("Beitrag konnte nicht gespeichert werden. Bitte gleich erneut versuchen.");
         return;
       }
     }
@@ -123,8 +139,8 @@ export function CommunityBoard() {
     setText("");
   }
 
-  const demoPosts: Post[] = bubbleSlug === "demo" ? partnerConfig.posts : [];
-  const visiblePosts = remotePosts.length > 0 ? remotePosts : [...localPosts, ...demoPosts];
+  const demoPosts: Post[] = isDemoBubble ? partnerConfig.posts : [];
+  const visiblePosts = remotePosts.length > 0 ? remotePosts : isDemoBubble ? [...localPosts, ...demoPosts] : [];
 
   if (!config.features.community) {
     return <p className="rounded-[1.5rem] bg-white p-5 text-sm font-semibold text-on-surface-variant shadow-ambient">Community ist für diese Bubble nicht aktiv.</p>;
@@ -132,21 +148,34 @@ export function CommunityBoard() {
 
   return (
     <div className="space-y-5">
-      {message ? <p className="rounded-[1.25rem] bg-white p-4 text-sm font-semibold text-on-surface-variant shadow-ambient">{message}</p> : null}
+      {message ? (
+        <div className="rounded-[1.25rem] bg-white p-4 text-sm font-semibold text-on-surface-variant shadow-ambient">
+          <p>{message}</p>
+          <button className="mt-3 min-h-10 rounded-full bg-surface px-4 text-xs font-black text-primary" type="button" onClick={() => window.location.reload()}>
+            Erneut laden
+          </button>
+        </div>
+      ) : null}
       {config.features.peopleHere ? (
         <section className="rounded-[1.5rem] bg-white p-5 shadow-ambient">
           <h2 className="text-xl font-bold text-on-surface">
             {headlineCount} {headlineLabel} gerade in dieser Bubble
           </h2>
-          {people.length > 0 ? (
-            <div className="mt-5 grid grid-cols-5 gap-3">
-              {people.map((person) => (
+          {visiblePeople.length > 0 ? (
+            <div className="mt-5 grid grid-cols-4 gap-3 sm:grid-cols-6">
+              {visiblePeople.map((person) => (
                 <button key={person.id} className="min-w-0 text-center" type="button" onClick={() => setSelectedPerson(person)}>
                   <AvatarCircle src={person.avatar} name={person.name} size="md" fallback="initial" className="mx-auto" />
                   <span className="mt-2 block truncate text-xs font-bold text-on-surface">{person.name}</span>
                   {person.active ? <span className="block text-[10px] font-bold text-secondary">gerade aktiv</span> : null}
                 </button>
               ))}
+              {additionalPeople > 0 ? (
+                <div className="flex min-w-0 flex-col items-center justify-center text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-high text-xs font-black text-primary">+{additionalPeople}</div>
+                  <span className="mt-2 block text-xs font-bold text-on-surface-variant">weitere</span>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </section>

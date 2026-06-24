@@ -57,9 +57,6 @@ export function clearStoredProfile(slug?: string) {
   window.localStorage.removeItem(voteKey);
   window.localStorage.removeItem(getPostsKey(activeSlug));
   window.localStorage.removeItem(postsKey);
-  window.localStorage.removeItem(getVisitorKey(activeSlug));
-  window.localStorage.removeItem(getLegacyVisitorKey(activeSlug));
-  window.localStorage.removeItem(getSessionKey(activeSlug));
 }
 
 export function createGuestProfile(): BubbleProfile {

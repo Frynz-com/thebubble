@@ -32,7 +32,16 @@ export function HuberArenaEntry({ bubbleSlug }: { bubbleSlug: string }) {
     <main className="relative min-h-svh overflow-hidden bg-on-surface" style={bubbleThemeStyle(config)}>
       {config.heroImageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={config.heroImageUrl} alt="Public Viewing in der Huber Arena" className="absolute inset-0 h-full w-full object-cover object-top" style={heroMediaStyle({ ...config, heroPositionY: "top" })} />
+        <img
+          src={config.heroImageUrl}
+          alt="Public Viewing in der Huber Arena"
+          className="absolute inset-0 h-full w-full object-cover object-top"
+          width={941}
+          height={1672}
+          decoding="async"
+          fetchPriority="high"
+          style={heroMediaStyle({ ...config, heroPositionY: "top" })}
+        />
       ) : (
         <div className="absolute inset-0 bg-on-surface" />
       )}

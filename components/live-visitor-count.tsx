@@ -2,9 +2,8 @@
 
 import { UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
-import { fetchActiveVisitorCount, getCurrentContext } from "@/lib/bubble-service";
-import { removeBubbleRealtime, subscribeToBubbleRealtime } from "@/lib/realtime";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import { fetchActiveVisitorCount, getActiveBubble } from "@/lib/bubble-service";
+import { getCurrentBubbleSlug } from "@/lib/bubble-routing";
 
 export function LiveVisitorCount({ inverted = false }: { inverted?: boolean }) {
   const [count, setCount] = useState<number | null>(null);
@@ -13,34 +12,26 @@ export function LiveVisitorCount({ inverted = false }: { inverted?: boolean }) {
 
   useEffect(() => {
     let mounted = true;
-    let channel: RealtimeChannel | null = null;
+    const bubbleSlug = getCurrentBubbleSlug();
 
     async function load() {
       try {
-        const context = await getCurrentContext();
-        if (!mounted || !context.bubble) return;
-        const nextCount = await fetchActiveVisitorCount(context.bubble.id);
+        const bubble = await getActiveBubble(bubbleSlug);
+        if (!mounted || !bubble) return;
+        const nextCount = await fetchActiveVisitorCount(bubble.id);
         if (!mounted) return;
         setCount(nextCount);
-        if (!channel) {
-          channel = subscribeToBubbleRealtime({
-            bubbleId: context.bubble.id,
-            channelName: `bubble-live-count-${context.bubble.id}`,
-            onChange: () => void load(),
-          });
-        }
       } catch {
         if (mounted) setCount(null);
       }
     }
 
     void load();
-    const interval = window.setInterval(() => void load(), 60_000);
+    const interval = window.setInterval(() => void load(), 30_000);
 
     return () => {
       mounted = false;
       window.clearInterval(interval);
-      removeBubbleRealtime(channel);
     };
   }, []);
 

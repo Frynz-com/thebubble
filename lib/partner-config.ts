@@ -210,8 +210,8 @@ export function getBubbleBranding(slug: string) {
     return {
       partnerName: "Huber Arena",
       eventName: "Public Viewing",
-      heroImage: "/images/huber-arena-cover.png",
-      logoImage: "/images/huber-arena-logo.png",
+      heroImage: "/images/huber-arena-cover.webp",
+      logoImage: "/images/huber-arena-logo.webp",
       socialProof: "Public Viewing in der Huber Arena",
     };
   }

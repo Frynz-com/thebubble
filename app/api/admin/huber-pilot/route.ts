@@ -111,6 +111,10 @@ function buildCsv(predictions: PredictionWithStatus[]) {
   return rows.join("\n");
 }
 
+function countDistinctVisitorSessions(rows: Array<{ id: string; session_id?: string | null }>) {
+  return new Set(rows.map((row) => row.session_id || row.id)).size;
+}
+
 export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) return jsonResponse({ error: "Nicht autorisiert." }, 401);
 
@@ -124,7 +128,7 @@ export async function GET(request: NextRequest) {
     const bubble = await getBubble(supabase, bubbleId, bubbleSlug);
     if (!bubble) return jsonResponse({ error: "Bubble wurde nicht gefunden." }, 404);
 
-    const activeSince = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const activeSince = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const [
       matchState,
       predictionsResult,
@@ -135,8 +139,8 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       ensureMatchState(supabase, bubble.id),
       supabase.from("match_predictions").select("*").eq("bubble_id", bubble.id).order("updated_at", { ascending: false }),
-      supabase.from("visitors").select("id,last_seen_at,created_at", { count: "exact" }).eq("bubble_id", bubble.id).order("last_seen_at", { ascending: false }).limit(1),
-      supabase.from("visitors").select("id", { count: "exact", head: true }).eq("bubble_id", bubble.id).eq("is_active", true).gte("last_seen_at", activeSince),
+      supabase.from("visitors").select("id,session_id,last_seen_at,created_at").eq("bubble_id", bubble.id).order("last_seen_at", { ascending: false }).limit(2000),
+      supabase.from("visitors").select("id,session_id,last_seen_at").eq("bubble_id", bubble.id).eq("is_active", true).gte("last_seen_at", activeSince).order("last_seen_at", { ascending: false }).limit(2000),
       supabase.from("posts").select("id,created_at", { count: "exact" }).eq("bubble_id", bubble.id).order("created_at", { ascending: false }).limit(1),
       supabase.from("analytics_events").select("id,created_at", { count: "exact" }).eq("bubble_id", bubble.id).order("created_at", { ascending: false }).limit(1),
     ]);
@@ -157,7 +161,7 @@ export async function GET(request: NextRequest) {
     const unparsed = decorated.filter((prediction) => prediction.parse_status !== "parsed");
     const contactMissingCorrect = decorated.filter((prediction) => prediction.correct_without_contact);
     const contactCount = decorated.filter((prediction) => prediction.has_contact).length;
-    const totalVisitors = visitorsResult.count ?? 0;
+    const totalVisitors = countDistinctVisitorSessions((visitorsResult.data ?? []) as Array<{ id: string; session_id?: string | null }>);
     const savedTips = decorated.length;
     const outcomeCounts = {
       deutschland: decorated.filter((prediction) => prediction.outcome_pick === "deutschland").length,
@@ -179,7 +183,7 @@ export async function GET(request: NextRequest) {
       matchState,
       summary: {
         totalVisitors,
-        activeVisitors15m: activeVisitorsResult.count ?? 0,
+        activeVisitors15m: countDistinctVisitorSessions((activeVisitorsResult.data ?? []) as Array<{ id: string; session_id?: string | null }>),
         savedTips,
         contactsProvided: contactCount,
         tipsWithoutContact: savedTips - contactCount,

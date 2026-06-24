@@ -299,8 +299,8 @@ const bubbleQuickLinks = [
 const localPublicBaseUrl = "http://127.0.0.1:3001";
 const productionPublicBaseUrl = "https://app.yourbubble.app";
 const huberArenaBranding = {
-  logo: "/images/huber-arena-logo.png",
-  cover: "/images/huber-arena-cover.png",
+  logo: "/images/huber-arena-logo.webp",
+  cover: "/images/huber-arena-cover.webp",
 };
 
 function configuredPublicBaseUrl() {
