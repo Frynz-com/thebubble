@@ -14,6 +14,14 @@ export type BubblePost = {
   time: string;
 };
 
+export type BubbleVisitorSession = {
+  visitor_id: string;
+  visitor_name?: string;
+  avatar_url?: string | null;
+  created_at?: string;
+  last_seen?: string;
+};
+
 export const profileKey = "the-bubble:profile";
 export const postsKey = "the-bubble:posts";
 export const voteKey = "the-bubble:vote";
@@ -140,18 +148,50 @@ function setStoredSessionId(value: string, slug?: string) {
 }
 
 export function getStoredVisitorId(slug?: string) {
-  if (typeof window === "undefined") return "";
+  return getStoredVisitorSession(slug)?.visitor_id ?? "";
+}
+
+export function getStoredVisitorSession(slug?: string): BubbleVisitorSession | null {
+  if (typeof window === "undefined") return null;
   const activeSlug = normalizeBubbleSlug(slug ?? getCurrentBubbleSlug());
-  return (
+  const stored =
     window.localStorage.getItem(getVisitorKey(activeSlug)) ??
     window.localStorage.getItem(getLegacyVisitorKey(activeSlug)) ??
     (activeSlug === "demo" ? window.localStorage.getItem(visitorKey) : "") ??
-    ""
-  );
+    "";
+
+  const session = parseStoredVisitorSession(stored);
+  if (session) setStoredVisitorSession(session, activeSlug);
+  return session;
 }
 
 export function setStoredVisitorId(value: string, slug?: string) {
-  window.localStorage.setItem(getVisitorKey(slug), value);
+  setStoredVisitorSession({ visitor_id: value, last_seen: new Date().toISOString() }, slug);
+}
+
+export function setStoredVisitorSession(session: BubbleVisitorSession, slug?: string) {
+  window.localStorage.setItem(getVisitorKey(slug), JSON.stringify(session));
   window.localStorage.removeItem(getLegacyVisitorKey(slug));
   window.localStorage.removeItem(visitorKey);
+}
+
+function parseStoredVisitorSession(value: string | null): BubbleVisitorSession | null {
+  if (!value) return null;
+
+  try {
+    const parsed = JSON.parse(value) as Partial<BubbleVisitorSession> | null;
+    if (parsed && typeof parsed === "object" && typeof parsed.visitor_id === "string" && parsed.visitor_id.trim()) {
+      return {
+        visitor_id: parsed.visitor_id,
+        visitor_name: typeof parsed.visitor_name === "string" ? parsed.visitor_name : undefined,
+        avatar_url: typeof parsed.avatar_url === "string" ? parsed.avatar_url : null,
+        created_at: typeof parsed.created_at === "string" ? parsed.created_at : undefined,
+        last_seen: typeof parsed.last_seen === "string" ? parsed.last_seen : undefined,
+      };
+    }
+  } catch {
+    if (value.trim()) return { visitor_id: value.trim() };
+  }
+
+  return value.trim() ? { visitor_id: value.trim() } : null;
 }

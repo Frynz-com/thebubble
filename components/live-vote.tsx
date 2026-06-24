@@ -77,16 +77,19 @@ export function LiveVote() {
   }, [bubbleSlug]);
 
   async function choose(id: string) {
+    if (selected) return;
+    let storedOption = id;
     if (poll && visitor) {
       try {
-        await submitPollVote(poll.id, visitor.id, id);
+        const vote = await submitPollVote(poll.id, visitor.id, id);
+        if (vote && typeof vote === "object" && "option_key" in vote) storedOption = vote.option_key;
       } catch {
         setMessage("Stimme wurde bereits abgegeben.");
       }
     }
-    setSelected(id);
-    window.localStorage.setItem(getVoteKey(bubbleSlug), id);
-    void trackBubbleEvent("poll_vote", { option: id, label: activeOptions.find((option) => option.key === id)?.label ?? id }, bubbleSlug);
+    setSelected(storedOption);
+    window.localStorage.setItem(getVoteKey(bubbleSlug), storedOption);
+    void trackBubbleEvent("poll_vote", { option: storedOption, label: activeOptions.find((option) => option.key === storedOption)?.label ?? storedOption }, bubbleSlug);
   }
 
   return (

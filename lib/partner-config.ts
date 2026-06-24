@@ -191,6 +191,7 @@ export function getBubbleBranding(slug: string) {
       partnerName: "The Bubble Demo",
       eventName: "Matchday Demo",
       heroImage: "/images/demo-stadium.jpg",
+      logoImage: "",
       socialProof: "42 Personen sind gerade dabei",
     };
   }
@@ -200,7 +201,18 @@ export function getBubbleBranding(slug: string) {
       partnerName: "Test Bubble",
       eventName: "Internal Test",
       heroImage: "",
+      logoImage: "",
       socialProof: "Test-Bubble ist bereit",
+    };
+  }
+
+  if (slug === "huber-arena") {
+    return {
+      partnerName: "Huber Arena",
+      eventName: "Public Viewing",
+      heroImage: "/images/huber-arena-cover.png",
+      logoImage: "/images/huber-arena-logo.png",
+      socialProof: "Public Viewing in der Huber Arena",
     };
   }
 
@@ -208,6 +220,7 @@ export function getBubbleBranding(slug: string) {
     partnerName: "The Bubble",
     eventName: "Live",
     heroImage: "",
+    logoImage: "",
     socialProof: "Live vor Ort",
   };
 }

@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, PointerEvent as ReactPointerEvent } from "react";
 import type { LucideIcon } from "lucide-react";
-import { BarChart3, Check, ExternalLink, Gift, Handshake, ImageIcon, Lock, MessageCircle, Plus, Radio, Save, Trophy, Upload, UsersRound, Vote } from "lucide-react";
+import { BarChart3, Check, Copy, ExternalLink, Gift, Handshake, ImageIcon, Lock, MessageCircle, Plus, Radio, Save, Trophy, Upload, UsersRound, Vote } from "lucide-react";
 import { formatBubbleType, heroMediaStyle, heroOverlayBackground, logoFrameClasses, logoImageClasses, logoImageStyle } from "@/lib/bubble-config";
 import type { HeroFit, HeroOverlay, HeroPositionX, HeroPositionY, HeroZoom, LogoBackground, LogoFit, LogoShape, LogoSize } from "@/lib/bubble-config";
 import { bubblePath, isReservedBubbleSlug } from "@/lib/bubble-routing";
+import { HuberPilotAdmin } from "@/components/huber-pilot-admin";
 
 const featureKeys = ["live", "community", "polls", "rewards", "peopleHere", "fanBattle", "sponsorCard"] as const;
 const sections = ["overview", "basics", "branding", "modules", "liveAction", "community", "rewards", "sponsor", "analytics"] as const;
@@ -296,9 +297,18 @@ const bubbleQuickLinks = [
 ] as const;
 
 const localPublicBaseUrl = "http://127.0.0.1:3001";
+const productionPublicBaseUrl = "https://app.yourbubble.app";
+const huberArenaBranding = {
+  logo: "/images/huber-arena-logo.png",
+  cover: "/images/huber-arena-cover.png",
+};
 
 function configuredPublicBaseUrl() {
   return (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/g, "");
+}
+
+function onlinePublicBaseUrl() {
+  return configuredPublicBaseUrl() || productionPublicBaseUrl;
 }
 
 function publicUrl(slug: string, path = "", baseUrl = configuredPublicBaseUrl() || localPublicBaseUrl) {
@@ -307,10 +317,23 @@ function publicUrl(slug: string, path = "", baseUrl = configuredPublicBaseUrl() 
 
 function normalizeApiBubble(bubble: ApiBubble): BuilderBubble {
   const rewards = normalizeRewards(bubble.config?.rewards, bubble);
+  const isHuberArena = bubble.slug === "huber-arena";
+  const huberDefaults = isHuberArena
+    ? {
+        heroFit: "cover",
+        heroPositionX: "center",
+        heroPositionY: "top",
+        logoFit: "contain",
+        logoBackground: "transparent",
+        logoSize: "large",
+      }
+    : {};
 
   return {
     ...emptyBubble,
     ...bubble,
+    logo_url: isHuberArena ? huberArenaBranding.logo : bubble.logo_url || emptyBubble.logo_url,
+    hero_image_url: isHuberArena ? huberArenaBranding.cover : bubble.hero_image_url || emptyBubble.hero_image_url,
     type: bubble.type || bubble.event_name || emptyBubble.type,
     features: {
       ...emptyBubble.features,
@@ -318,6 +341,7 @@ function normalizeApiBubble(bubble: ApiBubble): BuilderBubble {
     },
     config: {
       ...emptyBubble.config,
+      ...huberDefaults,
       ...bubble.config,
       rewardLinked: Boolean(bubble.config?.rewardLinked),
       rewards,
@@ -744,7 +768,7 @@ export function AdminBubbleBuilder() {
             {activeSection === "overview" ? (
               <Overview bubbles={sortedBubbles} onEdit={selectBubble} onNew={resetForm} />
             ) : activeSection === "analytics" ? (
-              <AnalyticsPanel summary={analytics} message={analyticsMessage} bubble={form} />
+              <AnalyticsPanel summary={analytics} message={analyticsMessage} bubble={form} adminSecret={secret} />
             ) : (
               <form className="rounded-[1.5rem] bg-white p-5 shadow-ambient" onSubmit={saveBubble}>
                 <SectionHeading title={sectionLabels[activeSection]} subtitle={form.name ? `${form.name} · /${normalizedFormSlug || "slug-fehlt"}` : "Neue Bubble"} />
@@ -827,6 +851,9 @@ function Overview({ bubbles, onEdit, onNew }: { bubbles: BuilderBubble[]; onEdit
                     <dd className="mt-1 font-semibold text-on-surface">{featureKeys.filter((key) => bubble.features[key]).length} aktiv</dd>
                   </div>
                 </dl>
+                <p className="mt-3 truncate rounded-full bg-surface px-3 py-2 text-xs font-bold text-on-surface-variant">
+                  Online: {publicUrl(bubble.slug, "", onlinePublicBaseUrl())}
+                </p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {bubble.primary_color ? <Badge>{bubble.primary_color}</Badge> : null}
                   {bubble.accent_color ? <Badge>{bubble.accent_color}</Badge> : null}
@@ -888,7 +915,12 @@ function BasicsFields({
   updateSlug: (value: string) => void;
 }) {
   const slug = normalizedSlug || toSlug(form.name) || "slug";
-  const siteBaseUrl = configuredPublicBaseUrl();
+  const onlineBaseUrl = onlinePublicBaseUrl();
+  const localLink = publicUrl(slug, "", localPublicBaseUrl);
+  const onlineLink = publicUrl(slug, "", onlineBaseUrl);
+  const liveLink = publicUrl(slug, "/live", onlineBaseUrl);
+  const communityLink = publicUrl(slug, "/community", onlineBaseUrl);
+  const benefitsLink = publicUrl(slug, "/benefits", onlineBaseUrl);
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -901,8 +933,14 @@ function BasicsFields({
       <section className="rounded-[1.5rem] bg-surface p-4 md:col-span-2">
         <p className="text-sm font-black text-on-surface">Öffentlicher Link</p>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <LinkBox label="Lokal" value={publicUrl(slug, "", localPublicBaseUrl)} href={bubblePath(slug)} />
-          <LinkBox label={siteBaseUrl ? "Online" : "Später online"} value={publicUrl(slug, "", siteBaseUrl || "https://yourbubble.app")} href={siteBaseUrl ? publicUrl(slug, "", siteBaseUrl) : bubblePath(slug)} external={Boolean(siteBaseUrl)} />
+          <LinkBox label="Lokal" value={localLink} href={bubblePath(slug)} />
+          <LinkBox label="Online" value={onlineLink} href={onlineLink} external />
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <CopyLinkButton label="Online-Link kopieren" value={onlineLink} />
+          <CopyLinkButton label="Live-Link kopieren" value={liveLink} />
+          <CopyLinkButton label="Community-Link kopieren" value={communityLink} />
+          <CopyLinkButton label="Vorteile-Link kopieren" value={benefitsLink} />
         </div>
         <p className="mt-3 text-xs font-semibold text-outline">Canonical: /{slug} · Legacy bleibt unter /b/{slug} erreichbar.</p>
       </section>
@@ -965,7 +1003,7 @@ function BrandingFields({
     heroPositionY,
     heroOverlay,
   };
-  const heroPreviewHeight = form.config.heroHeight === "compact" ? "min-h-[218px]" : form.config.heroHeight === "large" ? "min-h-[330px]" : "min-h-[270px]";
+  const heroPreviewHeight = "aspect-[9/16] min-h-0";
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_430px]">
@@ -1029,8 +1067,11 @@ function BrandingFields({
 
         <section className="rounded-[1.5rem] bg-surface p-4">
           <SectionHeading title="Cover/Titelbild" subtitle="Ausschnitt per Drag verschieben und Zoom einstellen." />
+          <p className="mt-3 rounded-[1rem] bg-white px-3 py-2 text-xs font-bold leading-5 text-on-surface-variant">
+            Für Handy optimiert - Hochformat empfohlen. Ideal: 1080x1920. Wichtige Inhalte mittig platzieren.
+          </p>
           <div className="mt-4 space-y-4">
-            <HeroPreviewFrame imageUrl={form.hero_image_url} config={heroPreviewConfig} heightClass="min-h-[220px]" fallbackFrom={previewPrimary} fallbackTo={previewAccent} />
+            <HeroPreviewFrame imageUrl={form.hero_image_url} config={heroPreviewConfig} heightClass="mx-auto aspect-[9/16] min-h-0 w-full max-w-[320px]" fallbackFrom={previewPrimary} fallbackTo={previewAccent} />
             <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
               <AssetField
                 label="Cover/Banner"
@@ -1080,25 +1121,29 @@ function BrandingFields({
         </details>
       </div>
       <div className="rounded-[2rem] bg-surface p-4 xl:sticky xl:top-5 xl:self-start">
-        <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-outline">Live Mobile Preview</p>
+        <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-outline">Mobile Branding Preview</p>
         <div className="mx-auto max-w-[390px] overflow-hidden rounded-[2.4rem] border-[10px] border-on-surface bg-white shadow-active">
-          <div className="flex h-14 items-center justify-between px-5">
-            <div className="flex items-center gap-3">
-              <div className={logoFrameClasses(logoPreviewConfig, false)}>
-                {form.logo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.logo_url} alt="" className={logoImageClasses(logoPreviewConfig)} style={logoImageStyle(logoPreviewConfig)} />
-                ) : (
+          <p className="bg-surface px-5 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-outline">In-Bubble Header</p>
+          <div className="relative flex h-20 items-center justify-center px-5">
+            {form.logo_url ? (
+              <div className="flex min-w-0 max-w-[calc(100%-3.75rem)] justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={form.logo_url} alt={form.partner_name || form.name || "Bubble Logo"} className="block h-auto max-h-[60px] w-auto max-w-[min(86vw,300px)] object-contain" style={logoImageStyle({ ...logoPreviewConfig, logoZoom: Math.max(80, logoZoom) })} />
+              </div>
+            ) : (
+              <div className="flex min-w-0 items-center gap-3">
+                <div className={logoFrameClasses(logoPreviewConfig, false)}>
                   <ImageIcon size={18} />
-                )}
+                </div>
+                <div className="min-w-0">
+                  <p className="max-w-[170px] truncate text-sm font-black text-on-surface">{form.partner_name || form.name || "Deine Bubble"}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">{form.type}</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="max-w-[170px] truncate text-sm font-black text-on-surface">{form.partner_name || form.name || "Deine Bubble"}</p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">{form.type}</p>
-              </div>
-            </div>
-            <div className="h-8 w-8 rounded-full bg-surface-container-high" />
+            )}
+            <div className="absolute right-5 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full bg-surface-container-high" />
           </div>
+          <p className="bg-surface px-5 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-outline">Entry/Landing vor dem Betreten</p>
           <div className={["relative overflow-hidden text-white", heroPreviewHeight].join(" ")}>
             {form.hero_image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -1107,12 +1152,7 @@ function BrandingFields({
               <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${previewPrimary}, ${previewAccent})` }} />
             )}
             <div className="absolute inset-0" style={{ background: heroOverlayBackground(heroPreviewConfig) }} />
-            <div className="relative flex min-h-[inherit] flex-col justify-end p-5">
-              <span className="mb-3 inline-flex w-fit rounded-full px-3 py-1 text-xs font-black text-white" style={{ backgroundColor: previewAccent }}>
-                {form.config.eventTitle || "Live"}
-              </span>
-              <h3 className="max-w-[280px] text-3xl font-black leading-9 drop-shadow-xl">{form.config.headline || form.partner_name || form.name || "Deine Bubble"}</h3>
-              <p className="mt-2 max-w-[300px] text-sm font-semibold leading-5 text-white/85">{form.config.subheadline || "Scannen, beitreten, live dabei sein."}</p>
+            <div className="relative flex h-full flex-col justify-end p-5">
               <button className="mt-5 min-h-12 rounded-full px-5 text-sm font-black text-white shadow-cta" style={{ backgroundColor: previewPrimary }} type="button">
                 Jetzt Bubble betreten
               </button>
@@ -1161,14 +1201,14 @@ function ChoiceGroup({ label, value, options, onChange }: { label: string; value
 function LogoPreviewBox({ imageUrl, config }: { imageUrl: string; config: LogoPreviewConfig }) {
   return (
     <div className="flex min-h-40 items-center justify-center rounded-[1.25rem] bg-white p-5">
-      <div className={logoFrameClasses({ ...config, logoSize: "large" }, false)}>
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt="" className={logoImageClasses(config)} style={logoImageStyle(config)} />
-        ) : (
+      {imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={imageUrl} alt="" className="block h-auto max-h-24 w-auto max-w-full object-contain" style={logoImageStyle({ ...config, logoZoom: Math.max(80, config.logoZoom) })} />
+      ) : (
+        <div className={logoFrameClasses({ ...config, logoSize: "large" }, false)}>
           <ImageIcon size={24} />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1291,7 +1331,7 @@ function HeroCropEditor({
       <HeroPreviewFrame
         imageUrl={imageUrl}
         config={config}
-        heightClass="min-h-[260px]"
+        heightClass="mx-auto aspect-[9/16] min-h-0 w-full max-w-[340px]"
         fallbackFrom={fallbackFrom}
         fallbackTo={fallbackTo}
         draggable
@@ -1593,7 +1633,7 @@ function TogglePill({ checked, onChange, label }: { checked: boolean; onChange: 
   );
 }
 
-function AnalyticsPanel({ summary, message, bubble }: { summary: AnalyticsSummary | null; message: string; bubble: BuilderBubble }) {
+function AnalyticsPanel({ summary, message, bubble, adminSecret }: { summary: AnalyticsSummary | null; message: string; bubble: BuilderBubble; adminSecret: string }) {
   const metrics = [
     ["Besucher", summary?.visitors ?? 0],
     ["Sessions", summary?.sessions ?? 0],
@@ -1634,6 +1674,7 @@ function AnalyticsPanel({ summary, message, bubble }: { summary: AnalyticsSummar
           </div>
         </section>
       </div>
+      {bubble.slug === "huber-arena" ? <HuberPilotAdmin adminSecret={adminSecret} bubble={bubble} /> : null}
     </div>
   );
 }
@@ -1650,6 +1691,39 @@ function SectionHeading({ title, subtitle }: { title: string; subtitle: string }
 function Badge({ children, tone = "default" }: { children: React.ReactNode; tone?: "default" | "good" | "muted" }) {
   const className = tone === "good" ? "bg-green-100 text-green-700" : tone === "muted" ? "bg-surface-container-high text-outline" : "bg-surface text-primary";
   return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${className}`}>{children}</span>;
+}
+
+function CopyLinkButton({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyLink() {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = value;
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-white px-3 text-xs font-black text-primary shadow-ambient transition active:scale-[0.98]" type="button" onClick={copyLink}>
+      {copied ? <Check size={14} /> : <Copy size={14} />}
+      {copied ? "Kopiert" : label}
+    </button>
+  );
 }
 
 function LinkBox({ label, value, href, external = false }: { label: string; value: string; href: string; external?: boolean }) {

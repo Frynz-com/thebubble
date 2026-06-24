@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import { logoFrameClasses, logoImageClasses, logoImageStyle } from "@/lib/bubble-config";
+import { logoFrameClasses, logoImageStyle } from "@/lib/bubble-config";
 import type { LogoBackground, LogoFit, LogoShape, LogoSize } from "@/lib/bubble-config";
 
 type BrandMarkProps = {
@@ -32,14 +32,23 @@ export function BrandMark({
   const logoConfig = { logoShape, logoFit, logoBackground, logoSize, logoCropX, logoCropY, logoZoom };
   const initial = partnerName.trim().slice(0, 1).toUpperCase() || "B";
 
+  if (logoUrl) {
+    return (
+      <div className="flex min-w-0 items-center">
+        <img
+          src={logoUrl}
+          alt={partnerName}
+          className="block h-auto max-h-[60px] w-auto max-w-[min(86vw,330px)] object-contain"
+          style={logoImageStyle({ ...logoConfig, logoZoom: Math.max(80, logoZoom) })}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-3">
       <div className={logoFrameClasses(logoConfig, inverted)}>
-        {logoUrl ? (
-          <img src={logoUrl} alt="" className={logoImageClasses(logoConfig)} style={logoImageStyle(logoConfig)} />
-        ) : (
-          <span className="text-sm font-black leading-none">{initial}</span>
-        )}
+        <span className="text-sm font-black leading-none">{initial}</span>
       </div>
       <div className="min-w-0 leading-none">
         <p className={["truncate text-xl font-extrabold tracking-normal", inverted ? "text-white" : "text-primary"].join(" ")}>

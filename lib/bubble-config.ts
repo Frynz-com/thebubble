@@ -305,6 +305,7 @@ export function formatBubbleType(value: string) {
 export function buildRuntimeBubbleConfig(slug: string, bubble: BubbleRow | null): RuntimeBubbleConfig {
   const normalizedSlug = normalizeBubbleSlug(slug);
   const fallbackBranding = getBubbleBranding(normalizedSlug);
+  const isHuberArena = normalizedSlug === "huber-arena";
   const name = optionalText(bubble?.name) || fallbackBranding.partnerName;
   const type = formatBubbleType(optionalText(bubble?.type) || optionalText(bubble?.event_name) || fallbackBranding.eventName);
   const legacyHeroPosition = oneOfFromJson(bubble?.config ?? null, "heroPosition", "center", ["center", "top", "bottom", "left", "right"] as const);
@@ -317,8 +318,8 @@ export function buildRuntimeBubbleConfig(slug: string, bubble: BubbleRow | null)
     partnerName: optionalText(bubble?.partner_name) || name,
     type,
     description: optionalText(bubble?.description),
-    logoUrl: optionalText(bubble?.logo_url),
-    heroImageUrl: optionalText(bubble?.hero_image_url) || fallbackBranding.heroImage,
+    logoUrl: isHuberArena ? fallbackBranding.logoImage : optionalText(bubble?.logo_url) || fallbackBranding.logoImage,
+    heroImageUrl: isHuberArena ? fallbackBranding.heroImage : optionalText(bubble?.hero_image_url) || fallbackBranding.heroImage,
     primaryColor: colorText(bubble?.primary_color, "#0058be"),
     accentColor: colorText(bubble?.accent_color, "#b61722"),
     rewardTitle: primaryReward?.title ?? optionalText(bubble?.reward_title),

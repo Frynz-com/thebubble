@@ -2,7 +2,7 @@ import { defaultBubbleSlug, getCurrentBubbleSlug, normalizeBubbleSlug } from "./
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "./supabase/browser";
 import { logSupabaseError } from "./supabase/log-error";
 import type { BubbleRow, FanBattleRow, PollRow, PollVoteRow, PostRow, VisitorRow } from "./supabase/types";
-import { BubbleProfile, createGuestProfile, getOrCreateSessionId, getStoredVisitorId, setStoredProfile, setStoredVisitorId } from "./storage";
+import { BubbleProfile, createGuestProfile, getOrCreateSessionId, getStoredVisitorId, setStoredProfile, setStoredVisitorSession } from "./storage";
 
 export const demoBubbleSlug = defaultBubbleSlug;
 
@@ -53,7 +53,16 @@ function profileFromVisitor(visitor: VisitorRow): BubbleProfile {
 }
 
 function storeVisitorState(visitor: VisitorRow, slug: string) {
-  setStoredVisitorId(visitor.id, slug);
+  setStoredVisitorSession(
+    {
+      visitor_id: visitor.id,
+      visitor_name: visitor.nickname,
+      avatar_url: visitor.avatar_url,
+      created_at: visitor.joined_at,
+      last_seen: visitor.last_seen_at,
+    },
+    slug,
+  );
   setStoredProfile(profileFromVisitor(visitor), slug);
 }
 
@@ -331,13 +340,13 @@ export async function fetchActiveVisitors(bubbleId: string) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return [];
 
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const activeSince = new Date(Date.now() - 15 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from("visitors")
     .select("*")
     .eq("bubble_id", bubbleId)
     .eq("is_active", true)
-    .gte("last_seen_at", fiveMinutesAgo)
+    .gte("last_seen_at", activeSince)
     .order("last_seen_at", { ascending: false });
   if (error) {
     logSupabaseError("fetchActiveVisitors", error);
@@ -350,13 +359,13 @@ export async function fetchActiveVisitorCount(bubbleId: string) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return 0;
 
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const activeSince = new Date(Date.now() - 15 * 60 * 1000).toISOString();
   const { count, error } = await supabase
     .from("visitors")
     .select("id", { count: "exact", head: true })
     .eq("bubble_id", bubbleId)
     .eq("is_active", true)
-    .gte("last_seen_at", fiveMinutesAgo);
+    .gte("last_seen_at", activeSince);
   if (error) {
     logSupabaseError("fetchActiveVisitorCount", error);
     throw error;
@@ -429,8 +438,16 @@ export async function fetchPollVotes(pollId: string) {
 export async function submitPollVote(pollId: string, visitorId: string, optionKey: string) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return null;
+
+  const { data: existingVote, error: existingError } = await supabase.from("poll_votes").select("*").eq("poll_id", pollId).eq("visitor_id", visitorId).maybeSingle();
+  if (existingError) throw existingError;
+  if (existingVote) return existingVote as PollVoteRow;
+
   const { error } = await supabase.from("poll_votes").insert({ poll_id: pollId, visitor_id: visitorId, option_key: optionKey });
-  if (error) throw error;
+  if (error) {
+    if (error.code === "23505" || error.message.toLowerCase().includes("duplicate")) return true;
+    throw error;
+  }
   return true;
 }
 

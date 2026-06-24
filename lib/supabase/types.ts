@@ -82,6 +82,40 @@ export type FanBattleEntryRow = {
   created_at: string;
 };
 
+export type MatchOutcome = "deutschland" | "unentschieden" | "ecuador";
+export type MatchParseStatus = "parsed" | "unparsed";
+
+export type MatchPredictionRow = {
+  id: string;
+  bubble_id: string;
+  visitor_id: string;
+  display_name: string | null;
+  contact_value: string | null;
+  outcome_pick: MatchOutcome;
+  exact_score_text: string;
+  germany_score: number | null;
+  ecuador_score: number | null;
+  parsed_outcome: MatchOutcome | null;
+  parse_status: MatchParseStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BubbleMatchStateRow = {
+  id: string;
+  bubble_id: string;
+  match_title: string;
+  team_home: string;
+  team_away: string;
+  current_germany_score: number | null;
+  current_ecuador_score: number | null;
+  final_germany_score: number | null;
+  final_ecuador_score: number | null;
+  match_status: "scheduled" | "live" | "final";
+  created_at: string;
+  updated_at: string;
+};
+
 export type AnalyticsEventType =
   | "page_view"
   | "enter_bubble"
@@ -143,6 +177,16 @@ export type Database = {
         Row: FanBattleEntryRow;
         Insert: Partial<FanBattleEntryRow> & Pick<FanBattleEntryRow, "fan_battle_id" | "visitor_id" | "selected_team" | "taps">;
         Update: Partial<FanBattleEntryRow>;
+      };
+      match_predictions: {
+        Row: MatchPredictionRow;
+        Insert: Partial<MatchPredictionRow> & Pick<MatchPredictionRow, "bubble_id" | "visitor_id" | "outcome_pick">;
+        Update: Partial<MatchPredictionRow>;
+      };
+      bubble_match_state: {
+        Row: BubbleMatchStateRow;
+        Insert: Partial<BubbleMatchStateRow> & Pick<BubbleMatchStateRow, "bubble_id">;
+        Update: Partial<BubbleMatchStateRow>;
       };
       analytics_events: {
         Row: AnalyticsEventRow;

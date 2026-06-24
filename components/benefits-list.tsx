@@ -10,6 +10,12 @@ import { useBubbleConfig } from "@/lib/bubble-config";
 import { trackBubbleEvent } from "@/lib/analytics";
 import { BenefitCard } from "./cards";
 
+const huberSecondaryPrizes = [
+  "1x 20 % adidas Rabattgutschein",
+  "1x 15 % JD Sports Rabattcode",
+  "1x 15 % ABOUT YOU Rabattgutschein",
+];
+
 export function BenefitsList() {
   const [selectedBenefit, setSelectedBenefit] = useState<Benefit | null>(null);
   const bubbleSlug = getBubbleSlugFromPathname(usePathname());
@@ -35,6 +41,34 @@ export function BenefitsList() {
   useEffect(() => {
     if (benefits.length > 0) void trackBubbleEvent("reward_view", { rewards: benefits.map((benefit) => benefit.title) }, bubbleSlug);
   }, [benefits, bubbleSlug]);
+
+  if (bubbleSlug === "huber-arena") {
+    return (
+      <section className="rounded-[1.4rem] bg-white p-5 shadow-ambient">
+        <div className="rounded-[1.2rem] bg-on-surface p-5 text-white">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/12 text-white">
+              <Gift size={20} />
+            </div>
+            <div>
+              <p className="text-3xl font-black leading-none">10x 15 €</p>
+              <h2 className="mt-2 text-lg font-black leading-6">Verzehrkarte</h2>
+              <p className="mt-1 text-sm font-semibold text-white/75">für die Huber Arena</p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          {huberSecondaryPrizes.map((prize) => (
+            <div key={prize} className="flex items-center gap-3 rounded-[1rem] bg-surface px-3 py-3">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />
+              <p className="text-sm font-black leading-5 text-on-surface">{prize}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-5 rounded-[1rem] bg-surface-container-low p-3 text-sm font-semibold leading-5 text-on-surface-variant">Gewinner werden nach dem Spiel über die angegebene Telefonnummer oder E-Mail benachrichtigt.</p>
+      </section>
+    );
+  }
 
   if (!config.features.rewards) {
     return <p className="rounded-[1.5rem] bg-white p-5 text-sm font-semibold text-on-surface-variant shadow-ambient">Vorteile sind für diese Bubble nicht aktiv.</p>;

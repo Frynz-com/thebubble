@@ -86,6 +86,7 @@ export function CommunityBoard() {
         : [];
 
   const headlineCount = activeVisitors.length;
+  const headlineLabel = headlineCount === 1 ? "Person ist" : "Personen sind";
 
   async function submitPost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -134,7 +135,9 @@ export function CommunityBoard() {
       {message ? <p className="rounded-[1.25rem] bg-white p-4 text-sm font-semibold text-on-surface-variant shadow-ambient">{message}</p> : null}
       {config.features.peopleHere ? (
         <section className="rounded-[1.5rem] bg-white p-5 shadow-ambient">
-          <h2 className="text-xl font-bold text-on-surface">{headlineCount} Personen sind gerade in dieser Bubble</h2>
+          <h2 className="text-xl font-bold text-on-surface">
+            {headlineCount} {headlineLabel} gerade in dieser Bubble
+          </h2>
           {people.length > 0 ? (
             <div className="mt-5 grid grid-cols-5 gap-3">
               {people.map((person) => (
