@@ -30,9 +30,9 @@ export function MobilePage({ title, subtitle, children }: MobilePageProps) {
       <PresenceHeartbeat />
       <AppHeader />
       <main className="phone-shell safe-bottom px-4 pt-24">
-        <div className="mb-7 animate-pop-in">
-          <h1 className="text-[28px] font-bold leading-[34px] tracking-normal text-on-surface">{title}</h1>
-          {subtitle ? <p className="mt-2 text-base leading-6 text-on-surface-variant">{subtitle}</p> : null}
+        <div className="mb-5 animate-pop-in">
+          <h1 className="text-[24px] font-bold leading-[30px] tracking-normal text-on-surface">{title}</h1>
+          {subtitle ? <p className="mt-1 text-sm font-semibold leading-5 text-on-surface-variant">{subtitle}</p> : null}
         </div>
         {children}
       </main>

@@ -224,11 +224,11 @@ export function ProfileSheet() {
     <>
       <button
         aria-label="Profil öffnen"
-        className="relative h-10 w-10 overflow-hidden rounded-full border-2 border-primary-container bg-surface-container-high"
+        className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-primary/25 bg-white text-primary shadow-[0_8px_22px_rgba(0,88,190,.14)]"
         type="button"
         onClick={() => setOpen(true)}
       >
-        <AvatarCircle src={profile.avatar} name={profile.name} size="sm" fallback="user" />
+        <AvatarCircle src={profile.avatar} name={profile.name} size="sm" fallback="user" className="bg-transparent" />
       </button>
 
       {mounted && open ? createPortal(sheet, document.body) : null}

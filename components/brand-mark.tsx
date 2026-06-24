@@ -34,11 +34,11 @@ export function BrandMark({
 
   if (logoUrl) {
     return (
-      <div className="flex min-w-0 items-center">
+      <div className="flex min-w-0 items-center rounded-[1.1rem] bg-white/95 px-2.5 py-1.5 shadow-[0_8px_22px_rgba(20,27,43,.08)] ring-1 ring-black/5">
         <img
           src={logoUrl}
           alt={partnerName}
-          className="block h-auto max-h-[60px] w-auto max-w-[min(86vw,330px)] object-contain"
+          className="block h-auto max-h-[48px] w-auto max-w-[min(72vw,286px)] object-contain"
           style={logoImageStyle({ ...logoConfig, logoZoom: Math.max(80, logoZoom) })}
         />
       </div>

@@ -3,10 +3,9 @@
 import { ArrowRight, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { BrandMark } from "@/components/brand-mark";
 import { ensureBubbleVisitor } from "@/lib/bubble-service";
 import { bubblePath, normalizeBubbleSlug } from "@/lib/bubble-routing";
-import { bubbleThemeStyle, heroMediaStyle, heroOverlayBackground, useBubbleConfig } from "@/lib/bubble-config";
+import { bubbleThemeStyle, heroMediaStyle, useBubbleConfig } from "@/lib/bubble-config";
 import { trackBubbleEvent } from "@/lib/analytics";
 
 export function HuberArenaEntry({ bubbleSlug }: { bubbleSlug: string }) {
@@ -37,27 +36,12 @@ export function HuberArenaEntry({ bubbleSlug }: { bubbleSlug: string }) {
       ) : (
         <div className="absolute inset-0 bg-on-surface" />
       )}
-      <div className="absolute inset-0" style={{ background: heroOverlayBackground({ ...config, heroOverlay: "light" }) }} />
+      <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(7,11,20,.54) 0%, rgba(7,11,20,.18) 46%, rgba(7,11,20,.08) 100%)" }} />
 
-      <div className="phone-shell relative z-10 flex min-h-svh flex-col px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
-        <header className="flex justify-center">
-          <BrandMark
-            inverted
-            partnerName={config.partnerName}
-            logoUrl={config.logoUrl}
-            logoShape={config.logoShape}
-            logoFit={config.logoFit}
-            logoBackground={config.logoBackground}
-            logoSize={config.logoSize}
-            logoCropX={config.logoCropX}
-            logoCropY={config.logoCropY}
-            logoZoom={config.logoZoom}
-          />
-        </header>
-
-        <section className="mt-auto animate-pop-in pb-2 text-center">
+      <div className="phone-shell relative z-10 flex min-h-svh flex-col px-5 pb-[calc(2.25rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
+        <section className="mt-auto animate-pop-in text-center">
           <button
-            className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-primary px-6 text-base font-black text-on-primary shadow-cta transition active:scale-[0.98] disabled:opacity-70"
+            className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-6 text-base font-black text-primary shadow-[0_18px_44px_rgba(0,0,0,.28)] ring-1 ring-white/55 transition active:scale-[0.98] disabled:opacity-70"
             type="button"
             disabled={busy}
             onClick={() => void enterBubble()}

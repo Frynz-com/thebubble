@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Gift, MessageCircle, Pencil, Save, Ticket, X } from "lucide-react";
+import { Check, Gift, MessageCircle, Pencil, Ticket, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { FormEvent, useEffect, useState } from "react";
 import { MobilePage } from "@/components/mobile-page";
@@ -144,17 +144,14 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
   return (
     <MobilePage title="Huber Arena" subtitle="Public Viewing">
       <div className="space-y-4">
-        <section className="overflow-hidden rounded-[1.35rem] bg-white shadow-ambient">
-          <div className="bg-on-surface px-4 py-5 text-white">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <section className="overflow-hidden rounded-[1.35rem] bg-on-surface shadow-ambient ring-1 ring-white/40">
+          <div className="px-4 py-5 text-white">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
               <TeamBlock flag="🇩🇪" team="Deutschland" align="left" />
-              <div className="rounded-full bg-white/12 px-3 py-1 text-sm font-black text-white/85">vs.</div>
+              <div className="rounded-full bg-white/10 px-3 py-1 text-sm font-black text-white/80 ring-1 ring-white/10">vs.</div>
               <TeamBlock flag="🇪🇨" team="Ecuador" align="right" />
             </div>
-            <div className="mt-4 rounded-[1rem] bg-white/12 px-4 py-3 text-center text-sm font-black text-white">{scoreLabel(matchState)}</div>
-          </div>
-          <div className="px-4 py-3">
-            <p className="text-sm font-black text-on-surface">Tipp abgeben & Gewinne sichern</p>
+            <div className="mt-4 rounded-[1rem] bg-white/10 px-4 py-3 text-center text-sm font-black leading-5 text-white ring-1 ring-white/10">{scoreLabel(matchState)}</div>
           </div>
         </section>
 
@@ -207,9 +204,9 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
                 <span className="mt-2 block text-xs font-semibold leading-5 text-on-surface-variant">Schreib dein Ergebnis einfach rein, z. B. 2:1 Deutschland oder 1:1.</span>
               </label>
 
-              <button className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-primary text-base font-black text-on-primary shadow-active disabled:opacity-60" type="submit" disabled={busy}>
-                <Save size={19} />
-                Tipp speichern
+              <button className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-primary text-base font-black text-on-primary shadow-active transition active:scale-[0.98] disabled:opacity-60" type="submit" disabled={busy}>
+                <Ticket size={19} />
+                Tipp einreichen
               </button>
             </form>
             {message ? <p className="mt-4 rounded-[1rem] bg-surface p-3 text-sm font-bold text-on-surface-variant">{message}</p> : null}
@@ -233,43 +230,43 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
           <section className="w-full max-w-md rounded-[1.45rem] bg-white p-5 shadow-active animate-pop-in">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-xl font-black leading-7 text-on-surface">Wie können wir dich im Gewinnfall erreichen?</h2>
-                <p className="mt-2 text-sm font-semibold leading-5 text-on-surface-variant">Wenn dein Tipp richtig ist, benachrichtigt dich die Huber Arena per Telefon oder E-Mail. Keine Registrierung.</p>
+                <h2 className="text-xl font-black leading-7 text-on-surface">Wie erreichen wir dich im Gewinnfall?</h2>
+                <p className="mt-2 text-sm font-semibold leading-5 text-on-surface-variant">Wenn dein Tipp richtig ist, benachrichtigt dich die Huber Arena per Telefon oder E-Mail. Keine Registrierung nötig.</p>
               </div>
-              <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-on-surface" type="button" aria-label="Schließen" onClick={() => setContactModalOpen(false)} disabled={busy}>
+              <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-on-surface transition active:scale-[0.96]" type="button" aria-label="Schließen" onClick={() => setContactModalOpen(false)} disabled={busy}>
                 <X size={18} />
               </button>
             </div>
 
             <div className="space-y-4">
               <label className="block">
-                <span className="mb-2 block text-sm font-bold text-on-surface">Fanname optional</span>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.08em] text-on-surface-variant">Fanname optional</span>
                 <input
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
                   placeholder="Dein Name oder Fanname"
-                  className="h-13 w-full rounded-[1.05rem] border-2 border-outline-variant/40 bg-surface px-4 text-base font-semibold text-on-surface outline-none placeholder:text-outline focus:border-primary"
+                  className="h-14 w-full rounded-[1.05rem] border border-outline-variant/45 bg-white px-4 text-base font-semibold text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,.9)] outline-none transition placeholder:text-outline focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
                   maxLength={48}
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-bold text-on-surface">Telefonnummer oder E-Mail</span>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.08em] text-on-surface-variant">Telefonnummer oder E-Mail</span>
                 <input
                   value={contactValue}
                   onChange={(event) => setContactValue(event.target.value)}
                   placeholder="Telefonnummer oder E-Mail"
-                  className="h-13 w-full rounded-[1.05rem] border-2 border-outline-variant/40 bg-surface px-4 text-base font-semibold text-on-surface outline-none placeholder:text-outline focus:border-primary"
+                  className="h-14 w-full rounded-[1.05rem] border border-outline-variant/45 bg-white px-4 text-base font-semibold text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,.9)] outline-none transition placeholder:text-outline focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
                   maxLength={120}
                 />
               </label>
-              <button className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-black text-on-primary shadow-active disabled:opacity-60" type="button" disabled={busy} onClick={() => void savePrediction(true)}>
+              <button className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-black text-on-primary shadow-active transition active:scale-[0.98] disabled:opacity-60" type="button" disabled={busy} onClick={() => void savePrediction(true)}>
                 <Ticket size={18} />
-                {busy ? "Speichere ..." : "Mit Kontakt speichern"}
+                {busy ? "Speichere ..." : "Mit Kontakt teilnehmen"}
               </button>
-              <button className="min-h-13 w-full rounded-full border-2 border-outline-variant bg-white px-4 text-sm font-black text-primary disabled:opacity-60" type="button" disabled={busy} onClick={() => void savePrediction(false)}>
-                Ohne Kontakt speichern
+              <button className="min-h-14 w-full rounded-full border border-outline-variant/70 bg-white px-4 text-sm font-black text-primary transition active:scale-[0.98] disabled:opacity-60" type="button" disabled={busy} onClick={() => void savePrediction(false)}>
+                Ohne Kontakt teilnehmen
               </button>
-              <p className="rounded-[1rem] bg-surface px-3 py-2 text-xs font-semibold leading-5 text-on-surface-variant">Ohne Kontakt kannst du teilnehmen, aber wir können dich im Gewinnfall nicht benachrichtigen.</p>
+              <p className="rounded-[1rem] bg-surface/70 px-3 py-2 text-xs font-semibold leading-5 text-on-surface-variant">Ohne Kontakt kannst du teilnehmen, aber wir können dich im Gewinnfall nicht benachrichtigen.</p>
             </div>
           </section>
         </div>
@@ -341,8 +338,8 @@ function SuccessCard({
 function TeamBlock({ flag, team, align }: { flag: string; team: string; align: "left" | "right" }) {
   return (
     <div className={["min-w-0", align === "right" ? "text-right" : "text-left"].join(" ")}>
-      <p className="text-3xl leading-none">{flag}</p>
-      <p className="mt-2 truncate text-base font-black leading-5">{team}</p>
+      <p className="text-[30px] leading-none">{flag}</p>
+      <p className="mt-2 truncate text-[15px] font-black leading-5">{team}</p>
     </div>
   );
 }
@@ -350,17 +347,17 @@ function TeamBlock({ flag, team, align }: { flag: string; team: string; align: "
 function PrizeTeaser({ href }: { href: string }) {
   return (
     <section className="rounded-[1.25rem] bg-white p-4 shadow-ambient">
-      <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary">
-          <Gift size={19} />
+      <div className="flex items-start gap-3.5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary">
+          <Gift size={18} />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-black text-on-surface">Das kannst du gewinnen</h2>
-          <div className="mt-3 rounded-[1rem] bg-surface p-3">
-            <p className="text-lg font-black leading-6 text-on-surface">10x 15 € Huber Arena Verzehrkarte</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 rounded-[1rem] bg-surface px-3 py-2.5">
+            <p className="text-base font-black leading-6 text-on-surface">10x 15 € Huber Arena Verzehrkarte</p>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
               {prizeChips.map((chip) => (
-                <span key={chip} className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-primary shadow-ambient">
+                <span key={chip} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-black leading-4 text-primary shadow-ambient">
                   {chip}
                 </span>
               ))}

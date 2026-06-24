@@ -1126,9 +1126,9 @@ function BrandingFields({
           <p className="bg-surface px-5 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-outline">In-Bubble Header</p>
           <div className="relative flex h-20 items-center justify-center px-5">
             {form.logo_url ? (
-              <div className="flex min-w-0 max-w-[calc(100%-3.75rem)] justify-center">
+              <div className="flex min-w-0 max-w-[calc(100%-3.75rem)] justify-center rounded-[1.1rem] bg-white/95 px-2.5 py-1.5 shadow-[0_8px_22px_rgba(20,27,43,.08)] ring-1 ring-black/5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={form.logo_url} alt={form.partner_name || form.name || "Bubble Logo"} className="block h-auto max-h-[60px] w-auto max-w-[min(86vw,300px)] object-contain" style={logoImageStyle({ ...logoPreviewConfig, logoZoom: Math.max(80, logoZoom) })} />
+                <img src={form.logo_url} alt={form.partner_name || form.name || "Bubble Logo"} className="block h-auto max-h-[48px] w-auto max-w-[min(72vw,286px)] object-contain" style={logoImageStyle({ ...logoPreviewConfig, logoZoom: Math.max(80, logoZoom) })} />
               </div>
             ) : (
               <div className="flex min-w-0 items-center gap-3">
