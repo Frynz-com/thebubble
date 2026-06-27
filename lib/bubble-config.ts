@@ -306,6 +306,7 @@ export function buildRuntimeBubbleConfig(slug: string, bubble: BubbleRow | null)
   const normalizedSlug = normalizeBubbleSlug(slug);
   const fallbackBranding = getBubbleBranding(normalizedSlug);
   const isHuberArena = normalizedSlug === "huber-arena";
+  const isQuickborn = normalizedSlug === "public-viewing-quickborn";
   const name = optionalText(bubble?.name) || fallbackBranding.partnerName;
   const type = formatBubbleType(optionalText(bubble?.type) || optionalText(bubble?.event_name) || fallbackBranding.eventName);
   const legacyHeroPosition = oneOfFromJson(bubble?.config ?? null, "heroPosition", "center", ["center", "top", "bottom", "left", "right"] as const);
@@ -318,10 +319,10 @@ export function buildRuntimeBubbleConfig(slug: string, bubble: BubbleRow | null)
     partnerName: optionalText(bubble?.partner_name) || name,
     type,
     description: optionalText(bubble?.description),
-    logoUrl: isHuberArena ? fallbackBranding.logoImage : optionalText(bubble?.logo_url) || fallbackBranding.logoImage,
-    heroImageUrl: isHuberArena ? fallbackBranding.heroImage : optionalText(bubble?.hero_image_url) || fallbackBranding.heroImage,
-    primaryColor: colorText(bubble?.primary_color, "#0058be"),
-    accentColor: colorText(bubble?.accent_color, "#b61722"),
+    logoUrl: isHuberArena || isQuickborn ? fallbackBranding.logoImage : optionalText(bubble?.logo_url) || fallbackBranding.logoImage,
+    heroImageUrl: isHuberArena || isQuickborn ? fallbackBranding.heroImage : optionalText(bubble?.hero_image_url) || fallbackBranding.heroImage,
+    primaryColor: colorText(bubble?.primary_color, isQuickborn ? "#dd0000" : "#0058be"),
+    accentColor: colorText(bubble?.accent_color, isQuickborn ? "#f7c800" : "#b61722"),
     rewardTitle: primaryReward?.title ?? optionalText(bubble?.reward_title),
     rewardDescription: primaryReward?.description ?? optionalText(bubble?.reward_description),
     rewardTerms: primaryReward?.hint ?? optionalText(bubble?.reward_terms),

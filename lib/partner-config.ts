@@ -216,6 +216,16 @@ export function getBubbleBranding(slug: string) {
     };
   }
 
+  if (slug === "public-viewing-quickborn") {
+    return {
+      partnerName: "Public Viewing Quickborn",
+      eventName: "Deutschland vs. Paraguay",
+      heroImage: "/public-viewing-quickborn/cover.png",
+      logoImage: "/public-viewing-quickborn/logo.jpg",
+      socialProof: "Public Viewing Quickborn",
+    };
+  }
+
   return {
     partnerName: "The Bubble",
     eventName: "Live",

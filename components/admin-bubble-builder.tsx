@@ -8,6 +8,7 @@ import { BarChart3, Check, Copy, ExternalLink, Gift, Handshake, ImageIcon, Lock,
 import { formatBubbleType, heroMediaStyle, heroOverlayBackground, logoFrameClasses, logoImageClasses, logoImageStyle } from "@/lib/bubble-config";
 import type { HeroFit, HeroOverlay, HeroPositionX, HeroPositionY, HeroZoom, LogoBackground, LogoFit, LogoShape, LogoSize } from "@/lib/bubble-config";
 import { bubblePath, isReservedBubbleSlug } from "@/lib/bubble-routing";
+import { isPublicViewingPilotSlug } from "@/lib/public-viewing-pilot";
 import { HuberPilotAdmin } from "@/components/huber-pilot-admin";
 
 const featureKeys = ["live", "community", "polls", "rewards", "peopleHere", "fanBattle", "sponsorCard"] as const;
@@ -1674,7 +1675,7 @@ function AnalyticsPanel({ summary, message, bubble, adminSecret }: { summary: An
           </div>
         </section>
       </div>
-      {bubble.slug === "huber-arena" ? <HuberPilotAdmin adminSecret={adminSecret} bubble={bubble} /> : null}
+      {isPublicViewingPilotSlug(bubble.slug) ? <HuberPilotAdmin adminSecret={adminSecret} bubble={bubble} /> : null}
     </div>
   );
 }

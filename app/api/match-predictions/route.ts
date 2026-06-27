@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseExactScoreText, normalizeOutcome } from "@/lib/match-prediction";
 import { normalizeBubbleSlug } from "@/lib/bubble-routing";
+import { getPublicViewingPilotConfig } from "@/lib/public-viewing-pilot";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { BubbleMatchStateRow, MatchPredictionRow, VisitorRow } from "@/lib/supabase/types";
 
@@ -55,18 +56,19 @@ async function getBubbleAndVisitor(bubbleSlug: string, visitorId: string, sessio
   return { supabase, bubble, visitor: visitor as VisitorRow | null };
 }
 
-async function ensureMatchState(supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>, bubbleId: string) {
+async function ensureMatchState(supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>, bubbleId: string, bubbleSlug: string) {
   const { data, error } = await supabase.from("bubble_match_state").select("*").eq("bubble_id", bubbleId).maybeSingle();
   if (error) throw error;
   if (data) return data as BubbleMatchStateRow;
 
+  const pilotConfig = getPublicViewingPilotConfig(bubbleSlug);
   const { data: inserted, error: insertError } = await supabase
     .from("bubble_match_state")
     .insert({
       bubble_id: bubbleId,
-      match_title: "Deutschland vs. Ecuador",
-      team_home: "Deutschland",
-      team_away: "Ecuador",
+      match_title: pilotConfig.matchTitle,
+      team_home: pilotConfig.homeTeam,
+      team_away: pilotConfig.awayTeam,
     })
     .select("*")
     .single();
@@ -86,7 +88,7 @@ export async function GET(request: NextRequest) {
     if (!bubble || !visitor) return jsonResponse({ error: "Besucher wurde nicht gefunden." }, 404);
 
     const [matchStateResult, predictionResult] = await Promise.all([
-      ensureMatchState(supabase, bubble.id),
+      ensureMatchState(supabase, bubble.id, bubbleSlug),
       supabase.from("match_predictions").select("*").eq("bubble_id", bubble.id).eq("visitor_id", visitor.id).order("created_at", { ascending: true }).limit(1),
     ]);
 
@@ -120,18 +122,32 @@ export async function POST(request: NextRequest) {
   const contactValue = cleanText(payload.contactValue, 120);
   const exactScoreText = cleanText(payload.exactScoreText, 120);
   const outcomePick = normalizeOutcome(payload.outcomePick);
+  const privacyConsentAccepted = payload.privacyConsentAccepted === true;
 
   if (!bubbleSlug || !visitorId || !sessionId) return jsonResponse({ error: "Bubble, Besucher und Session sind erforderlich." }, 400);
-  if (!outcomePick) return jsonResponse({ error: "Bitte wähle Deutschland, Unentschieden oder Ecuador." }, 400);
+  if (!outcomePick) {
+    const pilotConfig = getPublicViewingPilotConfig(bubbleSlug);
+    return jsonResponse({ error: `Bitte wähle ${pilotConfig.homeTeam}, Unentschieden oder ${pilotConfig.awayTeam}.` }, 400);
+  }
 
   try {
     const { supabase, bubble, visitor } = await getBubbleAndVisitor(bubbleSlug, visitorId, sessionId);
     if (!bubble || !visitor) return jsonResponse({ error: "Besucher wurde nicht gefunden." }, 404);
+    const pilotConfig = getPublicViewingPilotConfig(bubbleSlug);
+    const parsed = parseExactScoreText(exactScoreText);
+    if (pilotConfig.requiresExactScore && parsed.parseStatus !== "parsed") {
+      return jsonResponse({ error: "Bitte gib zuerst deinen genauen Ergebnistipp ab, um am Gewinnspiel teilzunehmen." }, 400);
+    }
+    if (pilotConfig.requiresContact && !contactValue) {
+      return jsonResponse({ error: "Bitte gib eine Telefonnummer oder E-Mail an, damit wir dich im Gewinnfall benachrichtigen können." }, 400);
+    }
+    if (pilotConfig.requiresContact && !privacyConsentAccepted) {
+      return jsonResponse({ error: "Bitte bestätige die Datenschutz- und Gewinnspiel-Einwilligung, um teilzunehmen." }, 400);
+    }
 
     const existingPrediction = await getExistingPrediction(supabase, bubble.id, visitor.id);
     if (existingPrediction) return jsonResponse({ prediction: existingPrediction, locked: true });
 
-    const parsed = parseExactScoreText(exactScoreText);
     const now = new Date().toISOString();
     const predictionPayload = {
       bubble_id: bubble.id,

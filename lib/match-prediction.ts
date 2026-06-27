@@ -16,10 +16,12 @@ export function outcomeFromScores(germanyScore: number, ecuadorScore: number): M
   return "unentschieden";
 }
 
-export function outcomeLabel(outcome: MatchOutcome | null | undefined) {
-  if (outcome === "deutschland") return "Deutschland";
-  if (outcome === "ecuador") return "Ecuador";
-  if (outcome === "unentschieden") return "Unentschieden";
+export type MatchOutcomeLabels = Partial<Record<MatchOutcome, string>>;
+
+export function outcomeLabel(outcome: MatchOutcome | null | undefined, labels?: MatchOutcomeLabels) {
+  if (outcome === "deutschland") return labels?.deutschland || "Deutschland";
+  if (outcome === "ecuador") return labels?.ecuador || "Ecuador";
+  if (outcome === "unentschieden") return labels?.unentschieden || "Unentschieden";
   return "-";
 }
 

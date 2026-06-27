@@ -4,6 +4,7 @@ import { Copy, Download, RefreshCcw, Save, Shuffle, Trash2 } from "lucide-react"
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { outcomeLabel, type MatchOutcome } from "@/lib/match-prediction";
+import { getPilotOutcomeLabels, getPublicViewingPilotConfig } from "@/lib/public-viewing-pilot";
 import type { BubbleMatchStateRow, MatchPredictionRow } from "@/lib/supabase/types";
 
 type HuberPrediction = MatchPredictionRow & {
@@ -76,12 +77,12 @@ async function huberPilotRequest(adminSecret: string, bubbleId: string, method: 
   return json;
 }
 
-function exportCsv(csv: string) {
+function exportCsv(csv: string, slug: string) {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `huber-arena-tipps-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = `${slug || "bubble"}-tipps-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -95,15 +96,14 @@ function chooseWinner(predictions: HuberPrediction[]) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-const prizePoolAdminText = "Gewinnpool: 10x 15 € Huber Arena Verzehrkarte, 1x 20 % adidas, 1x 15 % JD Sports, 1x 15 % ABOUT YOU.";
-
 export function HuberPilotAdmin({ adminSecret, bubble }: { adminSecret: string; bubble: AdminBubble }) {
+  const pilotConfig = getPublicViewingPilotConfig(bubble.slug);
   const [data, setData] = useState<HuberPilotData | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [matchTitle, setMatchTitle] = useState("Deutschland vs. Ecuador");
-  const [teamHome, setTeamHome] = useState("Deutschland");
-  const [teamAway, setTeamAway] = useState("Ecuador");
+  const [matchTitle, setMatchTitle] = useState(pilotConfig.matchTitle);
+  const [teamHome, setTeamHome] = useState(pilotConfig.homeTeam);
+  const [teamAway, setTeamAway] = useState(pilotConfig.awayTeam);
   const [currentGermanyScore, setCurrentGermanyScore] = useState("");
   const [currentEcuadorScore, setCurrentEcuadorScore] = useState("");
   const [finalGermanyScore, setFinalGermanyScore] = useState("");
@@ -114,6 +114,14 @@ export function HuberPilotAdmin({ adminSecret, bubble }: { adminSecret: string; 
   const bubbleId = bubble.id ?? "";
   const exactPoolLabel = data?.results.exactMatches.length ? "exakten Treffern" : "Tendenz-Treffern";
   const drawPool = useMemo(() => (data?.results.exactMatches.length ? data.results.exactMatches : (data?.results.tendencyMatches ?? [])), [data]);
+  const outcomeLabels = useMemo(
+    () => ({
+      ...getPilotOutcomeLabels(pilotConfig),
+      deutschland: teamHome || pilotConfig.homeTeam,
+      ecuador: teamAway || pilotConfig.awayTeam,
+    }),
+    [pilotConfig, teamAway, teamHome],
+  );
 
   async function load() {
     if (!bubbleId) return;
@@ -130,7 +138,7 @@ export function HuberPilotAdmin({ adminSecret, bubble }: { adminSecret: string; 
       setFinalGermanyScore(nextData.matchState.final_germany_score === null ? "" : String(nextData.matchState.final_germany_score));
       setFinalEcuadorScore(nextData.matchState.final_ecuador_score === null ? "" : String(nextData.matchState.final_ecuador_score));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Huber Pilot konnte nicht geladen werden.");
+      setMessage(error instanceof Error ? error.message : "Match Prediction Pilot konnte nicht geladen werden.");
     } finally {
       setBusy(false);
     }
@@ -185,7 +193,7 @@ export function HuberPilotAdmin({ adminSecret, bubble }: { adminSecret: string; 
   }
 
   if (!bubbleId) {
-    return <p className="rounded-[1rem] bg-surface p-3 text-sm font-semibold text-on-surface-variant">Bitte zuerst die Huber Arena Bubble speichern.</p>;
+    return <p className="rounded-[1rem] bg-surface p-3 text-sm font-semibold text-on-surface-variant">Bitte zuerst diese Bubble speichern.</p>;
   }
 
   return (
@@ -193,7 +201,7 @@ export function HuberPilotAdmin({ adminSecret, bubble }: { adminSecret: string; 
       <section className="rounded-[1.5rem] border border-outline-variant/35 p-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-xl font-black text-on-surface">Huber Arena Match Prediction Pilot</h3>
+            <h3 className="text-xl font-black text-on-surface">{pilotConfig.customerTitle} Match Prediction Pilot</h3>
             <p className="mt-1 text-sm font-semibold text-on-surface-variant">/{bubble.slug} · manuelle Spielsteuerung und Gewinnerauswertung</p>
           </div>
           <button className="inline-flex min-h-10 items-center gap-2 rounded-full bg-surface px-4 text-sm font-bold text-primary disabled:opacity-60" type="button" onClick={() => void load()} disabled={busy}>
@@ -208,8 +216,8 @@ export function HuberPilotAdmin({ adminSecret, bubble }: { adminSecret: string; 
           <Field label="Team 2" value={teamAway} onChange={setTeamAway} />
           <ScoreEditor
             title="Aktueller Spielstand"
-            leftLabel="Deutschland 🇩🇪"
-            rightLabel="Ecuador 🇪🇨"
+            leftLabel={`${teamHome || pilotConfig.homeTeam} ${pilotConfig.homeFlag}`}
+            rightLabel={`${teamAway || pilotConfig.awayTeam} ${pilotConfig.awayFlag}`}
             leftValue={currentGermanyScore}
             rightValue={currentEcuadorScore}
             onLeftChange={setCurrentGermanyScore}
@@ -220,8 +228,8 @@ export function HuberPilotAdmin({ adminSecret, bubble }: { adminSecret: string; 
           />
           <ScoreEditor
             title="Finales Ergebnis"
-            leftLabel="Deutschland 🇩🇪"
-            rightLabel="Ecuador 🇪🇨"
+            leftLabel={`${teamHome || pilotConfig.homeTeam} ${pilotConfig.homeFlag}`}
+            rightLabel={`${teamAway || pilotConfig.awayTeam} ${pilotConfig.awayFlag}`}
             leftValue={finalGermanyScore}
             rightValue={finalEcuadorScore}
             onLeftChange={setFinalGermanyScore}
@@ -250,7 +258,7 @@ export function HuberPilotAdmin({ adminSecret, bubble }: { adminSecret: string; 
         <div className="grid gap-3 md:grid-cols-3">
           {(["deutschland", "unentschieden", "ecuador"] as MatchOutcome[]).map((outcome) => (
             <div key={outcome} className="rounded-[1rem] bg-surface p-4">
-              <p className="text-sm font-black text-on-surface">{outcomeLabel(outcome)}</p>
+              <p className="text-sm font-black text-on-surface">{outcomeLabel(outcome, outcomeLabels)}</p>
               <p className="mt-2 text-2xl font-black text-primary">{data?.summary.outcomeCounts[outcome] ?? 0}</p>
               <p className="text-xs font-bold text-outline">{data?.summary.outcomePercentages[outcome] ?? 0}%</p>
             </div>
@@ -262,12 +270,12 @@ export function HuberPilotAdmin({ adminSecret, bubble }: { adminSecret: string; 
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-lg font-black text-on-surface">Gewinnerauswertung</h3>
-            <p className="mt-1 text-sm font-bold text-on-surface-variant">{prizePoolAdminText}</p>
+            <p className="mt-1 text-sm font-bold text-on-surface-variant">{pilotConfig.prizePoolAdminText}</p>
             {!data?.results.finalIsSet ? <p className="mt-1 text-sm font-bold text-amber-700">Finales Ergebnis noch nicht gesetzt.</p> : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <ActionButton icon={<Copy size={15} />} label="Gewinnerliste kopieren" onClick={() => void copyWinnerList()} />
-            <ActionButton icon={<Download size={15} />} label="CSV exportieren" onClick={() => exportCsv(data?.results.csv ?? "")} />
+            <ActionButton icon={<Download size={15} />} label="CSV exportieren" onClick={() => exportCsv(data?.results.csv ?? "", bubble.slug)} />
             <ActionButton icon={<Shuffle size={15} />} label={data?.results.exactMatches.length ? "Zufälligen Gewinner aus exakten Treffern ziehen" : "Zufälligen Gewinner aus Tendenz-Treffern ziehen"} onClick={drawWinner} />
           </div>
         </div>
@@ -278,10 +286,10 @@ export function HuberPilotAdmin({ adminSecret, bubble }: { adminSecret: string; 
         ) : null}
         {data?.results.finalIsSet ? (
           <>
-            <ResultList title="Exaktes Ergebnis richtig" predictions={data.results.exactMatches} />
-            <ResultList title="Tendenz richtig" predictions={data.results.tendencyMatches} />
-            <ResultList title="Nicht automatisch auswertbar" predictions={data.results.unparsed} />
-            <ResultList title="Kontakt fehlt trotz richtigem Tipp" predictions={data.results.contactMissingCorrect} highlightMissingContact />
+            <ResultList title="Exaktes Ergebnis richtig" predictions={data.results.exactMatches} outcomeLabels={outcomeLabels} />
+            <ResultList title="Tendenz richtig" predictions={data.results.tendencyMatches} outcomeLabels={outcomeLabels} />
+            <ResultList title="Nicht automatisch auswertbar" predictions={data.results.unparsed} outcomeLabels={outcomeLabels} />
+            <ResultList title="Kontakt fehlt trotz richtigem Tipp" predictions={data.results.contactMissingCorrect} outcomeLabels={outcomeLabels} highlightMissingContact />
           </>
         ) : (
           <p className="rounded-[1rem] bg-surface p-3 text-sm font-semibold text-on-surface-variant">Sobald du das finale Ergebnis speicherst, werden exakte Treffer, Tendenz-Treffer und nicht automatisch auswertbare Tipps berechnet.</p>
@@ -292,8 +300,8 @@ export function HuberPilotAdmin({ adminSecret, bubble }: { adminSecret: string; 
         <h3 className="text-lg font-black text-red-800">Testdaten dieser Bubble löschen</h3>
         <p className="mt-1 text-sm font-semibold text-red-700">Löscht Posts, Tipps, alte Poll Votes, Analytics und Besucher/Sessions dieser Bubble. Bubble, Config, Branding und Assets bleiben erhalten.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-          <Field label="Sicherheitsabfrage" value={resetConfirm} onChange={setResetConfirm} placeholder="RESET HUBER" />
-          <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-red-700 px-4 text-sm font-bold text-white disabled:opacity-50" type="button" disabled={busy || resetConfirm !== "RESET HUBER"} onClick={() => void saveAction("reset")}>
+          <Field label="Sicherheitsabfrage" value={resetConfirm} onChange={setResetConfirm} placeholder={pilotConfig.resetPlaceholder} />
+          <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-red-700 px-4 text-sm font-bold text-white disabled:opacity-50" type="button" disabled={busy || resetConfirm !== pilotConfig.resetCode} onClick={() => void saveAction("reset")}>
             <Trash2 size={16} />
             Testdaten dieser Bubble löschen
           </button>
@@ -302,7 +310,7 @@ export function HuberPilotAdmin({ adminSecret, bubble }: { adminSecret: string; 
 
       <section className="rounded-[1.5rem] border border-outline-variant/35 p-4">
         <h3 className="mb-3 text-lg font-black text-on-surface">Alle Tipps</h3>
-        <PredictionTable predictions={data?.predictions ?? []} />
+        <PredictionTable predictions={data?.predictions ?? []} outcomeLabels={outcomeLabels} />
       </section>
     </div>
   );
@@ -392,7 +400,17 @@ function ActionButton({ icon, label, onClick }: { icon: ReactNode; label: string
   );
 }
 
-function ResultList({ title, predictions, highlightMissingContact = false }: { title: string; predictions: HuberPrediction[]; highlightMissingContact?: boolean }) {
+function ResultList({
+  title,
+  predictions,
+  outcomeLabels,
+  highlightMissingContact = false,
+}: {
+  title: string;
+  predictions: HuberPrediction[];
+  outcomeLabels: Partial<Record<MatchOutcome, string>>;
+  highlightMissingContact?: boolean;
+}) {
   return (
     <div className="mb-4 rounded-[1rem] bg-surface p-3">
       <h4 className="mb-2 text-sm font-black text-on-surface">{title} ({predictions.length})</h4>
@@ -403,7 +421,7 @@ function ResultList({ title, predictions, highlightMissingContact = false }: { t
               <p className="font-black text-on-surface">
                 {prediction.display_label} · {prediction.short_visitor_id} · {prediction.contact_value || "Kontakt fehlt"}
               </p>
-              <p className="mt-1">{outcomeLabel(prediction.outcome_pick)} · {prediction.exact_score_text || "-"} · {parsedScore(prediction)} · {formatDate(prediction.updated_at)}</p>
+              <p className="mt-1">{outcomeLabel(prediction.outcome_pick, outcomeLabels)} · {prediction.exact_score_text || "-"} · {parsedScore(prediction)} · {formatDate(prediction.updated_at)}</p>
             </div>
           ))}
         </div>
@@ -414,7 +432,7 @@ function ResultList({ title, predictions, highlightMissingContact = false }: { t
   );
 }
 
-function PredictionTable({ predictions }: { predictions: HuberPrediction[] }) {
+function PredictionTable({ predictions, outcomeLabels }: { predictions: HuberPrediction[]; outcomeLabels: Partial<Record<MatchOutcome, string>> }) {
   if (!predictions.length) return <p className="rounded-[1rem] bg-surface p-3 text-sm font-semibold text-on-surface-variant">Noch keine Tipps gespeichert.</p>;
 
   return (
@@ -445,7 +463,7 @@ function PredictionTable({ predictions }: { predictions: HuberPrediction[] }) {
               <td className={["px-3 py-3 font-black", prediction.has_contact ? "text-green-700" : "text-amber-700"].join(" ")}>
                 {prediction.has_contact ? "Kontakt vorhanden" : "Kontakt fehlt"}
               </td>
-              <td className="px-3 py-3 font-semibold">{outcomeLabel(prediction.outcome_pick)}</td>
+              <td className="px-3 py-3 font-semibold">{outcomeLabel(prediction.outcome_pick, outcomeLabels)}</td>
               <td className="px-3 py-3 font-semibold">{prediction.exact_score_text || "-"}</td>
               <td className="px-3 py-3 font-semibold">{parsedScore(prediction)}</td>
               <td className="px-3 py-3 font-semibold">{parseStatusLabel(prediction)}</td>

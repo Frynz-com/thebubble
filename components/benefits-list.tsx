@@ -8,6 +8,7 @@ import type { Benefit } from "@/lib/partner-config";
 import { getBubbleSlugFromPathname } from "@/lib/bubble-routing";
 import { useBubbleConfig } from "@/lib/bubble-config";
 import { trackBubbleEvent } from "@/lib/analytics";
+import { getPublicViewingPilotConfig } from "@/lib/public-viewing-pilot";
 import { BenefitCard } from "./cards";
 
 const huberSecondaryPrizes = [
@@ -66,6 +67,35 @@ export function BenefitsList() {
           ))}
         </div>
         <p className="mt-5 rounded-[1rem] bg-surface-container-low p-3 text-sm font-semibold leading-5 text-on-surface-variant">Gewinner werden nach dem Spiel über die angegebene Telefonnummer oder E-Mail benachrichtigt.</p>
+      </section>
+    );
+  }
+
+  if (bubbleSlug === "public-viewing-quickborn") {
+    const pilotConfig = getPublicViewingPilotConfig(bubbleSlug);
+    return (
+      <section className="rounded-[1.4rem] bg-white p-5 shadow-ambient">
+        <div className="rounded-[1.25rem] bg-on-surface p-5 text-white">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/12 text-white">
+              <Gift size={20} />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-white/65">Gewinnspiel</p>
+              <h2 className="mt-2 text-2xl font-black leading-7">{pilotConfig.prizeTitle}</h2>
+              <p className="mt-2 text-sm font-semibold leading-5 text-white/75">{pilotConfig.benefitsIntro}</p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          {pilotConfig.detailedPrizes.map((prize) => (
+            <div key={prize} className="flex items-start gap-3 rounded-[1rem] bg-surface px-3 py-3">
+              <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />
+              <p className="text-sm font-black leading-5 text-on-surface">{prize}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-5 rounded-[1rem] bg-surface-container-low p-3 text-sm font-semibold leading-5 text-on-surface-variant">{pilotConfig.benefitsHint}</p>
       </section>
     );
   }

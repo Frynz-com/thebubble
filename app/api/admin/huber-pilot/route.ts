@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { displayPredictionName, outcomeFromScores, outcomeLabel, shortVisitorId } from "@/lib/match-prediction";
+import { getPilotOutcomeLabels, getPublicViewingPilotConfig } from "@/lib/public-viewing-pilot";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { BubbleMatchStateRow, MatchOutcome, MatchPredictionRow } from "@/lib/supabase/types";
 
@@ -61,34 +62,35 @@ async function getBubble(supabase: NonNullable<ReturnType<typeof getSupabaseAdmi
   return data;
 }
 
-async function ensureMatchState(supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>, bubbleId: string) {
+async function ensureMatchState(supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>, bubbleId: string, bubbleSlug: string) {
   const { data, error } = await supabase.from("bubble_match_state").select("*").eq("bubble_id", bubbleId).maybeSingle();
   if (error) throw error;
   if (data) return data as BubbleMatchStateRow;
 
+  const pilotConfig = getPublicViewingPilotConfig(bubbleSlug);
   const { data: inserted, error: insertError } = await supabase
     .from("bubble_match_state")
-    .insert({ bubble_id: bubbleId, match_title: "Deutschland vs. Ecuador", team_home: "Deutschland", team_away: "Ecuador" })
+    .insert({ bubble_id: bubbleId, match_title: pilotConfig.matchTitle, team_home: pilotConfig.homeTeam, team_away: pilotConfig.awayTeam })
     .select("*")
     .single();
   if (insertError) throw insertError;
   return inserted as BubbleMatchStateRow;
 }
 
-function buildCopyList(predictions: PredictionWithStatus[]) {
+function buildCopyList(predictions: PredictionWithStatus[], labels = getPilotOutcomeLabels("huber-arena")) {
   return predictions
     .map((prediction, index) =>
       [
         `${index + 1}. ${prediction.display_label}`,
         prediction.contact_value ? `Kontakt: ${prediction.contact_value}` : "Kontakt fehlt",
-        `Tipp: ${outcomeLabel(prediction.outcome_pick)} / ${prediction.exact_score_text || "-"}`,
+        `Tipp: ${outcomeLabel(prediction.outcome_pick, labels)} / ${prediction.exact_score_text || "-"}`,
         `Gast-ID: ${prediction.short_visitor_id}`,
       ].join(" | "),
     )
     .join("\n");
 }
 
-function buildCsv(predictions: PredictionWithStatus[]) {
+function buildCsv(predictions: PredictionWithStatus[], labels = getPilotOutcomeLabels("huber-arena")) {
   const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
   const rows = [
     ["Fanname", "Kontakt", "Kontaktstatus", "Gewinner-Tipp", "Genauer Ergebnistipp Originaltext", "Automatisch erkanntes Ergebnis", "Parse-Status", "Zeitpunkt", "Gast-ID", "Exakt richtig", "Tendenz richtig"].map(escape).join(","),
@@ -97,7 +99,7 @@ function buildCsv(predictions: PredictionWithStatus[]) {
         prediction.display_label,
         prediction.contact_value ?? "",
         prediction.has_contact ? "Kontakt vorhanden" : "Kontakt fehlt",
-        outcomeLabel(prediction.outcome_pick),
+        outcomeLabel(prediction.outcome_pick, labels),
         prediction.exact_score_text,
         prediction.parse_status === "parsed" ? `${prediction.germany_score}:${prediction.ecuador_score}` : "nicht automatisch auswertbar",
         prediction.parse_status,
@@ -127,6 +129,12 @@ export async function GET(request: NextRequest) {
   try {
     const bubble = await getBubble(supabase, bubbleId, bubbleSlug);
     if (!bubble) return jsonResponse({ error: "Bubble wurde nicht gefunden." }, 404);
+    const pilotConfig = getPublicViewingPilotConfig(bubble.slug);
+    const outcomeLabels = getPilotOutcomeLabels({
+      ...pilotConfig,
+      homeTeam: pilotConfig.homeTeam,
+      awayTeam: pilotConfig.awayTeam,
+    });
 
     const activeSince = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const [
@@ -137,7 +145,7 @@ export async function GET(request: NextRequest) {
       postsResult,
       analyticsResult,
     ] = await Promise.all([
-      ensureMatchState(supabase, bubble.id),
+      ensureMatchState(supabase, bubble.id, bubble.slug),
       supabase.from("match_predictions").select("*").eq("bubble_id", bubble.id).order("updated_at", { ascending: false }),
       supabase.from("visitors").select("id,session_id,last_seen_at,created_at").eq("bubble_id", bubble.id).order("last_seen_at", { ascending: false }).limit(2000),
       supabase.from("visitors").select("id,session_id,last_seen_at").eq("bubble_id", bubble.id).eq("is_active", true).gte("last_seen_at", activeSince).order("last_seen_at", { ascending: false }).limit(2000),
@@ -205,8 +213,8 @@ export async function GET(request: NextRequest) {
         tendencyMatches,
         unparsed,
         contactMissingCorrect,
-        copyText: buildCopyList(exactMatches.length ? exactMatches : tendencyMatches),
-        csv: buildCsv(decorated),
+        copyText: buildCopyList(exactMatches.length ? exactMatches : tendencyMatches, outcomeLabels),
+        csv: buildCsv(decorated, outcomeLabels),
       },
     });
   } catch (error) {
@@ -235,23 +243,24 @@ export async function POST(request: NextRequest) {
   try {
     const bubble = await getBubble(supabase, bubbleId, bubbleSlug);
     if (!bubble) return jsonResponse({ error: "Bubble wurde nicht gefunden." }, 404);
+    const pilotConfig = getPublicViewingPilotConfig(bubble.slug);
 
     if (action === "update-current" || action === "save-final") {
       const update =
         action === "update-current"
           ? {
-              match_title: cleanText(payload.matchTitle, 120) || "Deutschland vs. Ecuador",
-              team_home: cleanText(payload.teamHome, 60) || "Deutschland",
-              team_away: cleanText(payload.teamAway, 60) || "Ecuador",
+              match_title: cleanText(payload.matchTitle, 120) || pilotConfig.matchTitle,
+              team_home: cleanText(payload.teamHome, 60) || pilotConfig.homeTeam,
+              team_away: cleanText(payload.teamAway, 60) || pilotConfig.awayTeam,
               current_germany_score: nullableScore(payload.currentGermanyScore),
               current_ecuador_score: nullableScore(payload.currentEcuadorScore),
               match_status: "live",
               updated_at: new Date().toISOString(),
             }
           : {
-              match_title: cleanText(payload.matchTitle, 120) || "Deutschland vs. Ecuador",
-              team_home: cleanText(payload.teamHome, 60) || "Deutschland",
-              team_away: cleanText(payload.teamAway, 60) || "Ecuador",
+              match_title: cleanText(payload.matchTitle, 120) || pilotConfig.matchTitle,
+              team_home: cleanText(payload.teamHome, 60) || pilotConfig.homeTeam,
+              team_away: cleanText(payload.teamAway, 60) || pilotConfig.awayTeam,
               final_germany_score: nullableScore(payload.finalGermanyScore),
               final_ecuador_score: nullableScore(payload.finalEcuadorScore),
               match_status: "final",
@@ -266,7 +275,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "reset") {
-      if (cleanText(payload.confirm, 40) !== "RESET HUBER") return jsonResponse({ error: "Bitte RESET HUBER exakt eingeben." }, 400);
+      if (cleanText(payload.confirm, 40) !== pilotConfig.resetCode) return jsonResponse({ error: `Bitte ${pilotConfig.resetCode} exakt eingeben.` }, 400);
 
       const { data: polls, error: pollError } = await supabase.from("polls").select("id").eq("bubble_id", bubble.id);
       if (pollError) throw pollError;
@@ -291,9 +300,9 @@ export async function POST(request: NextRequest) {
         .from("bubble_match_state")
         .upsert({
           bubble_id: bubble.id,
-          match_title: "Deutschland vs. Ecuador",
-          team_home: "Deutschland",
-          team_away: "Ecuador",
+          match_title: pilotConfig.matchTitle,
+          team_home: pilotConfig.homeTeam,
+          team_away: pilotConfig.awayTeam,
           current_germany_score: null,
           current_ecuador_score: null,
           final_germany_score: null,
