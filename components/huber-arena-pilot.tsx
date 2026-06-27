@@ -5,6 +5,7 @@ import { Check, Gift, MessageCircle, Ticket, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { MobilePage } from "@/components/mobile-page";
+import { LegalBottomSheet } from "@/components/legal-bottom-sheet";
 import { ensureBubbleVisitor } from "@/lib/bubble-service";
 import { bubblePath } from "@/lib/bubble-routing";
 import { useBubbleConfig } from "@/lib/bubble-config";
@@ -12,6 +13,7 @@ import { outcomeFromScores, outcomeLabel, parseExactScoreText, type MatchOutcome
 import { getPilotOutcomeLabels, getPublicViewingPilotConfig, outcomeOptionsForPilot } from "@/lib/public-viewing-pilot";
 import { getOrCreateSessionId } from "@/lib/storage";
 import type { BubbleMatchStateRow, MatchPredictionRow, VisitorRow } from "@/lib/supabase/types";
+import { trackBubbleEvent } from "@/lib/analytics";
 
 type PredictionResponse = {
   visitor?: VisitorRow;
@@ -59,6 +61,9 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [legalSheet, setLegalSheet] = useState<"privacy" | "terms" | null>(null);
+  const [scoreInputStarted, setScoreInputStarted] = useState(false);
+  const isQuickborn = bubbleSlug === "public-viewing-quickborn";
   const activeHomeTeam = matchState?.team_home || runtimeConfig.homeTeamName || pilotConfig.homeTeam;
   const activeAwayTeam = matchState?.team_away || runtimeConfig.awayTeamName || pilotConfig.awayTeam;
   const requiresExactScore = pilotConfig.requiresExactScore;
@@ -79,6 +84,10 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
       })),
     [bubbleSlug, outcomeLabels],
   );
+
+  useEffect(() => {
+    if (isQuickborn) void trackBubbleEvent("live_view", { source: pilotConfig.source }, bubbleSlug);
+  }, [bubbleSlug, isQuickborn, pilotConfig.source]);
 
   useEffect(() => {
     let active = true;
@@ -103,7 +112,7 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
           setContactValue(data.prediction.contact_value ?? "");
           setOutcomePick(data.prediction.outcome_pick);
           setExactScoreText(data.prediction.exact_score_text ?? "");
-          if (bubbleSlug === "public-viewing-quickborn") {
+          if (isQuickborn) {
             const parsed = parseExactScoreText(data.prediction.exact_score_text ?? "");
             setQuickbornHomeScore(parsed.germanyScore === null ? "" : String(parsed.germanyScore));
             setQuickbornAwayScore(parsed.ecuadorScore === null ? "" : String(parsed.ecuadorScore));
@@ -120,10 +129,11 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
     return () => {
       active = false;
     };
-  }, [bubbleSlug]);
+  }, [bubbleSlug, isQuickborn]);
 
   function openContactStep(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isQuickborn) void trackBubbleEvent("score_submit_attempt", { has_score: Boolean(exactScoreText) }, bubbleSlug);
     if (!visitor) {
       setMessage("Besucher wird noch vorbereitet. Bitte kurz erneut versuchen.");
       return;
@@ -139,6 +149,10 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
     setMessage("");
     setPrivacyAccepted(false);
     setContactModalOpen(true);
+    if (isQuickborn) {
+      void trackBubbleEvent("score_submit_success", { score_entered: true }, bubbleSlug);
+      void trackBubbleEvent("contact_modal_open", { source: "score_submit" }, bubbleSlug);
+    }
   }
 
   async function savePrediction(saveContact: boolean) {
@@ -151,11 +165,12 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
       setContactModalOpen(false);
       return;
     }
+    if (isQuickborn) void trackBubbleEvent("contact_submit_attempt", { has_contact: Boolean(contactValue.trim()) }, bubbleSlug);
     if (requiresContact && !contactValue.trim()) {
-      setMessage("Bitte gib eine Telefonnummer oder E-Mail an, damit wir dich im Gewinnfall benachrichtigen können.");
+      setMessage(isQuickborn ? "Bitte gib eine Telefonnummer oder E-Mail an, damit wir dich im Gewinnfall erreichen können." : "Bitte gib eine Telefonnummer oder E-Mail an, damit wir dich im Gewinnfall benachrichtigen können.");
       return;
     }
-    if (requiresContact && !privacyAccepted) {
+    if (requiresContact && !isQuickborn && !privacyAccepted) {
       setMessage("Bitte bestätige die Datenschutz- und Gewinnspiel-Einwilligung, um teilzunehmen.");
       return;
     }
@@ -171,7 +186,7 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
         contactValue: saveContact ? contactValue : "",
         outcomePick: effectiveOutcomePick,
         exactScoreText,
-        privacyConsentAccepted: privacyAccepted,
+        privacyConsentAccepted: isQuickborn || privacyAccepted,
       });
       if (data.prediction) {
         setDisplayName(data.prediction.display_name ?? "");
@@ -182,6 +197,7 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
       setSaved(true);
       setContactModalOpen(false);
       setMessage("");
+      if (isQuickborn) void trackBubbleEvent("contact_submit_success", { has_display_name: Boolean(displayName.trim()) }, bubbleSlug);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Tipp konnte nicht gespeichert werden.");
     } finally {
@@ -190,6 +206,10 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
   }
 
   function updateQuickbornScore(side: "home" | "away", value: string) {
+    if (isQuickborn && !scoreInputStarted) {
+      setScoreInputStarted(true);
+      void trackBubbleEvent("score_input_start", { side }, bubbleSlug);
+    }
     const clean = value.replace(/\D/g, "").slice(0, 2);
     const nextHome = side === "home" ? clean : quickbornHomeScore;
     const nextAway = side === "away" ? clean : quickbornAwayScore;
@@ -237,7 +257,8 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
             <form className="space-y-5" onSubmit={openContactStep}>
               {requiresExactScore ? (
                 <div>
-                  <p className="mb-3 text-base font-black text-on-surface">Dein genauer Ergebnistipp</p>
+                  <p className="text-xl font-black leading-7 text-on-surface">Dein genauer Ergebnistipp</p>
+                  <p className="mt-1 mb-4 text-sm font-semibold leading-5 text-on-surface-variant">Tippe das Endergebnis und sichere dir deine Gewinnchance.</p>
                   <div className="rounded-[1.15rem] bg-surface p-3">
                     <div className="grid grid-cols-[minmax(0,1fr)_64px_auto_64px_minmax(0,1fr)] items-center gap-2">
                       <span className="min-w-0 text-right text-sm font-black leading-5 text-on-surface">{activeHomeTeam}</span>
@@ -290,7 +311,7 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
 
               <button className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-primary text-base font-black text-on-primary shadow-active transition active:scale-[0.98] disabled:opacity-60" type="submit" disabled={busy}>
                 <Ticket size={19} />
-                Tipp einreichen
+                {isQuickborn ? "Tipp speichern & teilnehmen" : "Tipp einreichen"}
               </button>
             </form>
             {message ? <p className="mt-4 rounded-[1rem] bg-surface p-3 text-sm font-bold text-on-surface-variant">{message}</p> : null}
@@ -300,6 +321,7 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
         <section className="grid gap-3">
           <PrizeTeaser href={bubblePath(bubbleSlug, "/benefits")} pilotConfig={pilotConfig} />
           <TeaserCard
+            bubbleSlug={bubbleSlug}
             icon={<MessageCircle size={18} />}
             title="Was sagen die anderen Fans?"
             text="Schreib deinen Tipp oder deine Meinung in die Bubble."
@@ -343,7 +365,34 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
                   maxLength={120}
                 />
               </label>
-              {requiresContact ? (
+              {requiresContact && isQuickborn ? (
+                <p className="rounded-[1rem] bg-surface px-3 py-3 text-xs font-semibold leading-5 text-on-surface-variant">
+                  Mit dem Absenden bestätigst du die{" "}
+                  <button
+                    className="font-black text-primary underline underline-offset-2"
+                    type="button"
+                    onClick={() => {
+                      setLegalSheet("terms");
+                      void trackBubbleEvent("terms_open", { source: "contact_modal" }, bubbleSlug);
+                    }}
+                  >
+                    Teilnahmebedingungen
+                  </button>{" "}
+                  und{" "}
+                  <button
+                    className="font-black text-primary underline underline-offset-2"
+                    type="button"
+                    onClick={() => {
+                      setLegalSheet("privacy");
+                      void trackBubbleEvent("privacy_open", { source: "contact_modal" }, bubbleSlug);
+                    }}
+                  >
+                    Datenschutzhinweise
+                  </button>{" "}
+                  und bist einverstanden, dass wir dich im Gewinnfall kontaktieren.
+                </p>
+              ) : null}
+              {requiresContact && !isQuickborn ? (
                 <>
                   <label className="flex items-start gap-3 rounded-[1rem] bg-surface/80 p-3">
                     <input
@@ -365,7 +414,7 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
               {message ? <p className="rounded-[1rem] bg-surface p-3 text-sm font-bold text-on-surface-variant">{message}</p> : null}
               <button className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-black text-on-primary shadow-active transition active:scale-[0.98] disabled:opacity-60" type="button" disabled={busy} onClick={() => void savePrediction(true)}>
                 <Ticket size={18} />
-                {busy ? "Speichere ..." : "Mit Kontakt teilnehmen"}
+                {busy ? "Speichere ..." : isQuickborn ? "Am Gewinnspiel teilnehmen" : "Mit Kontakt teilnehmen"}
               </button>
               {!requiresContact ? (
                 <>
@@ -378,6 +427,13 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
             </div>
           </section>
         </div>
+      ) : null}
+      {isQuickborn && legalSheet ? (
+        <LegalBottomSheet
+          title={legalSheet === "privacy" ? "Datenschutzhinweise" : "Teilnahmebedingungen"}
+          body={legalSheet === "privacy" ? pilotConfig.privacyNoticeText : pilotConfig.termsText}
+          onClose={() => setLegalSheet(null)}
+        />
       ) : null}
     </MobilePage>
   );
@@ -403,8 +459,8 @@ function SuccessCard({
           <Check size={22} />
         </div>
         <div>
-          <h2 className="text-xl font-black text-on-surface">Dein Tipp ist gespeichert.</h2>
-          <p className="mt-1 text-sm font-bold text-on-surface-variant">Komm zum Ende des Spiels nochmal rein.</p>
+          <h2 className="text-xl font-black text-on-surface">Dein Tipp ist gespeichert</h2>
+          <p className="mt-1 text-sm font-bold text-on-surface-variant">Wir benachrichtigen dich im Gewinnfall.</p>
         </div>
       </div>
       <dl className="grid gap-2 rounded-[1rem] bg-surface p-3 text-sm">
@@ -426,11 +482,26 @@ function SuccessCard({
         </div>
       </dl>
       <div className="mt-4 grid gap-2">
-        <Link className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-black text-on-primary" href={bubblePath(bubbleSlug, "/community")}>
+        <Link
+          className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-black text-on-primary"
+          href={bubblePath(bubbleSlug, "/community")}
+          onClick={() => {
+            if (bubbleSlug === "public-viewing-quickborn") void trackBubbleEvent("cta_community_click", { source: "success_card" }, bubbleSlug);
+          }}
+        >
           <MessageCircle size={17} />
           Zum Community-Chat
         </Link>
-        <Link className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-surface px-4 text-sm font-black text-primary" href={bubblePath(bubbleSlug, "/benefits")}>
+        <Link
+          className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-surface px-4 text-sm font-black text-primary"
+          href={bubblePath(bubbleSlug, "/benefits")}
+          onClick={() => {
+            if (bubbleSlug === "public-viewing-quickborn") {
+              void trackBubbleEvent("cta_benefits_click", { source: "success_card" }, bubbleSlug);
+              void trackBubbleEvent("benefits_click", { source: "success_card" }, bubbleSlug);
+            }
+          }}
+        >
           <Gift size={17} />
           Gewinne ansehen
         </Link>
@@ -482,8 +553,16 @@ function PrizeTeaser({ href, pilotConfig }: { href: string; pilotConfig: ReturnT
               ))}
             </div>
           </div>
-          <p className="mt-3 text-xs font-semibold leading-5 text-on-surface-variant">{pilotConfig.prizeHint}</p>
-          <Link className="mt-3 inline-flex min-h-10 items-center rounded-full bg-primary px-4 text-sm font-black text-on-primary" href={href}>
+          <Link
+            className="mt-3 inline-flex min-h-10 items-center rounded-full bg-primary px-4 text-sm font-black text-on-primary"
+            href={href}
+            onClick={() => {
+              if (pilotConfig.slug === "public-viewing-quickborn") {
+                void trackBubbleEvent("cta_benefits_click", { source: "live_prize_teaser" }, pilotConfig.slug);
+                void trackBubbleEvent("benefits_click", { source: "live_prize_teaser" }, pilotConfig.slug);
+              }
+            }}
+          >
             Gewinne ansehen
           </Link>
         </div>
@@ -501,7 +580,7 @@ function DisclosureButton({ title, open, onClick }: { title: string; open: boole
   );
 }
 
-function TeaserCard({ icon, title, text, href, button }: { icon: ReactNode; title: string; text: string; href: string; button: string }) {
+function TeaserCard({ bubbleSlug, icon, title, text, href, button }: { bubbleSlug: string; icon: ReactNode; title: string; text: string; href: string; button: string }) {
   return (
     <section className="rounded-[1.25rem] bg-white p-4 shadow-ambient">
       <div className="flex items-start gap-3">
@@ -509,7 +588,13 @@ function TeaserCard({ icon, title, text, href, button }: { icon: ReactNode; titl
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-black text-on-surface">{title}</h2>
           <p className="mt-1 text-sm font-semibold leading-5 text-on-surface-variant">{text}</p>
-          <Link className="mt-3 inline-flex min-h-10 items-center rounded-full bg-surface px-4 text-sm font-black text-primary" href={href}>
+          <Link
+            className="mt-3 inline-flex min-h-10 items-center rounded-full bg-surface px-4 text-sm font-black text-primary"
+            href={href}
+            onClick={() => {
+              if (bubbleSlug === "public-viewing-quickborn") void trackBubbleEvent("cta_community_click", { source: "live_teaser" }, bubbleSlug);
+            }}
+          >
             {button}
           </Link>
         </div>

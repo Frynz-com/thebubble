@@ -126,13 +126,35 @@ export type AnalyticsEventType =
   | "reward_view"
   | "reward_claim"
   | "sponsor_click"
-  | "module_click";
+  | "module_click"
+  | "landing_view"
+  | "landing_cta_click"
+  | "privacy_open"
+  | "terms_open"
+  | "live_view"
+  | "score_input_start"
+  | "score_submit_attempt"
+  | "score_submit_success"
+  | "contact_modal_open"
+  | "contact_submit_attempt"
+  | "contact_submit_success"
+  | "benefits_view"
+  | "benefits_click"
+  | "community_view"
+  | "community_post_attempt"
+  | "community_post_success"
+  | "tab_live_click"
+  | "tab_community_click"
+  | "tab_benefits_click"
+  | "cta_community_click"
+  | "cta_benefits_click";
 
 export type AnalyticsEventRow = {
   id: string;
   bubble_id: string;
   visitor_id: string | null;
   session_id: string | null;
+  anonymous_session_id: string | null;
   event_type: AnalyticsEventType;
   path: string | null;
   metadata: Json;

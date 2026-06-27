@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       return jsonResponse({ error: "Bitte gib zuerst deinen genauen Ergebnistipp ab, um am Gewinnspiel teilzunehmen." }, 400);
     }
     if (pilotConfig.requiresContact && !contactValue) {
-      return jsonResponse({ error: "Bitte gib eine Telefonnummer oder E-Mail an, damit wir dich im Gewinnfall benachrichtigen können." }, 400);
+      return jsonResponse({ error: bubbleSlug === "public-viewing-quickborn" ? "Bitte gib eine Telefonnummer oder E-Mail an, damit wir dich im Gewinnfall erreichen können." : "Bitte gib eine Telefonnummer oder E-Mail an, damit wir dich im Gewinnfall benachrichtigen können." }, 400);
     }
     if (pilotConfig.requiresContact && !privacyConsentAccepted) {
       return jsonResponse({ error: "Bitte bestätige die Datenschutz- und Gewinnspiel-Einwilligung, um teilzunehmen." }, 400);

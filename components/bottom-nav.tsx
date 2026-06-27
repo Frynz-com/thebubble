@@ -26,6 +26,17 @@ export function BottomNav() {
 
   if (visibleItems.length === 0) return null;
 
+  function trackTabClick(itemPath: string, label: string, href: string) {
+    if (slug === "public-viewing-quickborn") {
+      if (itemPath === "/live") void trackBubbleEvent("tab_live_click", { href }, slug);
+      else if (itemPath === "/community") void trackBubbleEvent("tab_community_click", { href }, slug);
+      else void trackBubbleEvent("tab_benefits_click", { href }, slug);
+      return;
+    }
+
+    void trackBubbleEvent("module_click", { module: label.toLowerCase(), href }, slug);
+  }
+
   return (
     <nav className="fixed bottom-0 left-0 z-50 w-full bg-surface/80 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2 shadow-active backdrop-blur-xl">
       <div className="phone-shell grid min-h-16 items-center gap-1" style={{ gridTemplateColumns: `repeat(${visibleItems.length}, minmax(0, 1fr))` }}>
@@ -41,7 +52,7 @@ export function BottomNav() {
                 "flex min-h-12 flex-col items-center justify-center rounded-full px-2 py-2 text-xs font-bold transition active:scale-95",
                 active ? "bg-primary-container text-on-primary-container" : "text-on-surface-variant",
               ].join(" ")}
-              onClick={() => void trackBubbleEvent("module_click", { module: item.label.toLowerCase(), href }, slug)}
+              onClick={() => trackTabClick(item.path, item.label, href)}
             >
               <Icon size={21} fill={active ? "currentColor" : "none"} />
               <span className="mt-1 leading-none">{item.label}</span>

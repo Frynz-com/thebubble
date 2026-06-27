@@ -2,12 +2,13 @@
 
 import { ArrowRight, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ensureBubbleVisitor } from "@/lib/bubble-service";
 import { bubblePath, normalizeBubbleSlug } from "@/lib/bubble-routing";
 import { bubbleThemeStyle, heroMediaStyle, useBubbleConfig } from "@/lib/bubble-config";
 import { trackBubbleEvent } from "@/lib/analytics";
 import { getPublicViewingPilotConfig } from "@/lib/public-viewing-pilot";
+import { LegalBottomSheet } from "@/components/legal-bottom-sheet";
 
 export function HuberArenaEntry({ bubbleSlug }: { bubbleSlug: string }) {
   const normalizedSlug = normalizeBubbleSlug(bubbleSlug);
@@ -18,12 +19,22 @@ export function HuberArenaEntry({ bubbleSlug }: { bubbleSlug: string }) {
   const [message, setMessage] = useState("");
   const [heroFailed, setHeroFailed] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
+  const [legalSheet, setLegalSheet] = useState<"privacy" | "terms" | null>(null);
   const isQuickborn = normalizedSlug === "public-viewing-quickborn";
+
+  useEffect(() => {
+    if (!isQuickborn) return;
+    void trackBubbleEvent("landing_view", { source: pilotConfig.source }, normalizedSlug);
+  }, [isQuickborn, normalizedSlug, pilotConfig.source]);
 
   async function enterBubble() {
     setBusy(true);
     setMessage("");
     try {
+      if (isQuickborn) {
+        window.localStorage.setItem("quickborn_terms_accepted_at", new Date().toISOString());
+        void trackBubbleEvent("landing_cta_click", { source: pilotConfig.source }, normalizedSlug);
+      }
       await ensureBubbleVisitor(normalizedSlug);
       void trackBubbleEvent("enter_bubble", { source: pilotConfig.source }, normalizedSlug);
       router.push(bubblePath(normalizedSlug, "/live"));
@@ -90,10 +101,43 @@ export function HuberArenaEntry({ bubbleSlug }: { bubbleSlug: string }) {
             {isQuickborn ? "Jetzt Bubble beitreten" : "Jetzt Bubble betreten"}
             {!busy ? <ArrowRight size={20} /> : null}
           </button>
-          {isQuickborn ? <p className="mt-3 px-2 text-xs font-semibold leading-5 text-white drop-shadow-[0_3px_10px_rgba(0,0,0,.55)]">Mit dem Beitritt akzeptierst du die Teilnahmebedingungen und Datenschutzhinweise.</p> : null}
+          {isQuickborn ? (
+            <p className="mt-3 px-2 text-xs font-semibold leading-5 text-white drop-shadow-[0_3px_10px_rgba(0,0,0,.55)]">
+              Mit dem Beitritt akzeptierst du die{" "}
+              <button
+                className="underline decoration-white/80 underline-offset-2"
+                type="button"
+                onClick={() => {
+                  setLegalSheet("terms");
+                  void trackBubbleEvent("terms_open", { source: "landing" }, normalizedSlug);
+                }}
+              >
+                Teilnahmebedingungen
+              </button>{" "}
+              und{" "}
+              <button
+                className="underline decoration-white/80 underline-offset-2"
+                type="button"
+                onClick={() => {
+                  setLegalSheet("privacy");
+                  void trackBubbleEvent("privacy_open", { source: "landing" }, normalizedSlug);
+                }}
+              >
+                Datenschutzhinweise
+              </button>
+              .
+            </p>
+          ) : null}
           {message ? <p className="mt-3 rounded-[1rem] bg-white/90 px-3 py-2 text-sm font-bold text-on-surface">{message}</p> : null}
         </section>
       </div>
+      {isQuickborn && legalSheet ? (
+        <LegalBottomSheet
+          title={legalSheet === "privacy" ? "Datenschutzhinweise" : "Teilnahmebedingungen"}
+          body={legalSheet === "privacy" ? pilotConfig.privacyNoticeText : pilotConfig.termsText}
+          onClose={() => setLegalSheet(null)}
+        />
+      ) : null}
     </main>
   );
 }

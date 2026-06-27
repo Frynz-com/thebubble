@@ -20,6 +20,7 @@ export function MobilePage({ title, subtitle, children }: MobilePageProps) {
   const pathname = usePathname();
   const bubbleSlug = getBubbleSlugFromPathname(pathname);
   const config = useBubbleConfig(bubbleSlug);
+  const hideHeading = bubbleSlug === "public-viewing-quickborn" && pathname.endsWith("/live");
 
   useEffect(() => {
     void trackBubbleEvent("page_view", { page: pathname }, bubbleSlug);
@@ -30,10 +31,12 @@ export function MobilePage({ title, subtitle, children }: MobilePageProps) {
       <PresenceHeartbeat />
       <AppHeader />
       <main className="phone-shell safe-bottom px-4 pt-24">
-        <div className="mb-5 animate-pop-in">
-          <h1 className="text-[24px] font-bold leading-[30px] tracking-normal text-on-surface">{title}</h1>
-          {subtitle ? <p className="mt-1 text-sm font-semibold leading-5 text-on-surface-variant">{subtitle}</p> : null}
-        </div>
+        {!hideHeading ? (
+          <div className="mb-5 animate-pop-in">
+            <h1 className="text-[24px] font-bold leading-[30px] tracking-normal text-on-surface">{title}</h1>
+            {subtitle ? <p className="mt-1 text-sm font-semibold leading-5 text-on-surface-variant">{subtitle}</p> : null}
+          </div>
+        ) : null}
         {children}
       </main>
       <BottomNav />

@@ -2,6 +2,7 @@
 
 import { Send, X } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { BubblePerson, Post } from "@/lib/partner-config";
 import { partnerConfig } from "@/lib/partner-config";
 import { AvatarCircle } from "@/components/avatar-circle";
@@ -13,14 +14,14 @@ import {
   mapPost,
 } from "@/lib/bubble-service";
 import { useBubbleConfig } from "@/lib/bubble-config";
-import { getCurrentBubbleSlug } from "@/lib/bubble-routing";
+import { getBubbleSlugFromPathname } from "@/lib/bubble-routing";
 import { trackBubbleEvent } from "@/lib/analytics";
 import type { BubbleRow, VisitorRow } from "@/lib/supabase/types";
 import { BubblePost, getStoredPosts, getStoredProfile, setStoredPosts } from "@/lib/storage";
 import { PostCard } from "./cards";
 
 export function CommunityBoard() {
-  const bubbleSlug = getCurrentBubbleSlug();
+  const bubbleSlug = getBubbleSlugFromPathname(usePathname());
   const isDemoBubble = bubbleSlug === "demo";
   const config = useBubbleConfig(bubbleSlug);
   const [text, setText] = useState("");
@@ -31,6 +32,10 @@ export function CommunityBoard() {
   const [visitor, setVisitor] = useState<VisitorRow | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<BubblePerson | null>(null);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (bubbleSlug === "public-viewing-quickborn") void trackBubbleEvent("community_view", { source: "community_page" }, bubbleSlug);
+  }, [bubbleSlug]);
 
   useEffect(() => {
     setLocalPosts(isDemoBubble ? getStoredPosts(bubbleSlug) : []);
@@ -100,6 +105,7 @@ export function CommunityBoard() {
     event.preventDefault();
     const cleanText = text.trim();
     if (!cleanText) return;
+    if (bubbleSlug === "public-viewing-quickborn") void trackBubbleEvent("community_post_attempt", { has_text: true }, bubbleSlug);
 
     if (!bubble || !visitor) {
       if (!isDemoBubble) {
@@ -112,6 +118,7 @@ export function CommunityBoard() {
       try {
         await createPost(bubble.id, visitor.id, cleanText.slice(0, 180));
         void trackBubbleEvent("community_post", { length: cleanText.length }, bubbleSlug);
+        if (bubbleSlug === "public-viewing-quickborn") void trackBubbleEvent("community_post_success", { length_bucket: cleanText.length > 80 ? "long" : "short" }, bubbleSlug);
         setText("");
         const posts = await fetchPosts(bubble.id);
         setRemotePosts(posts.map(mapPost));
@@ -136,6 +143,7 @@ export function CommunityBoard() {
     setLocalPosts(nextPosts);
     setStoredPosts(nextPosts, bubbleSlug);
     void trackBubbleEvent("community_post", { length: cleanText.length, local: true }, bubbleSlug);
+    if (bubbleSlug === "public-viewing-quickborn") void trackBubbleEvent("community_post_success", { local: true, length_bucket: cleanText.length > 80 ? "long" : "short" }, bubbleSlug);
     setText("");
   }
 

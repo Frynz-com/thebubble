@@ -40,6 +40,10 @@ export function BenefitsList() {
   );
 
   useEffect(() => {
+    if (bubbleSlug === "public-viewing-quickborn") {
+      void trackBubbleEvent("benefits_view", { source: "benefits_page" }, bubbleSlug);
+      return;
+    }
     if (benefits.length > 0) void trackBubbleEvent("reward_view", { rewards: benefits.map((benefit) => benefit.title) }, bubbleSlug);
   }, [benefits, bubbleSlug]);
 
@@ -74,21 +78,21 @@ export function BenefitsList() {
   if (bubbleSlug === "public-viewing-quickborn") {
     const pilotConfig = getPublicViewingPilotConfig(bubbleSlug);
     return (
-      <section className="rounded-[1.4rem] bg-white p-5 shadow-ambient">
-        <div className="rounded-[1.25rem] bg-on-surface p-5 text-white">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/12 text-white">
+      <section className="rounded-[1.4rem] bg-white p-4 shadow-ambient">
+        <div className="rounded-[1.25rem] bg-on-surface px-5 py-6 text-white">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/12 text-white">
               <Gift size={20} />
             </div>
             <div>
               <h2 className="text-2xl font-black leading-7">{pilotConfig.prizeTitle}</h2>
-              <p className="mt-2 text-lg font-black leading-6 text-white">{pilotConfig.prizeMain}</p>
+              <p className="mt-3 text-lg font-black leading-6 text-white">{pilotConfig.prizeMain}</p>
             </div>
           </div>
         </div>
-        <div className="mt-4 space-y-2">
+        <div className="mt-3 space-y-2">
           {pilotConfig.detailedPrizes.map((prize) => (
-            <div key={prize} className="flex items-start gap-3 rounded-[1rem] bg-surface px-3 py-3">
+            <div key={prize} className="flex items-start gap-3 rounded-[1rem] bg-surface px-4 py-3.5">
               <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />
               <p className="text-sm font-black leading-5 text-on-surface">{prize}</p>
             </div>

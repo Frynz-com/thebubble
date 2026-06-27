@@ -117,6 +117,32 @@ type AnalyticsSummary = {
   rewardViews: number;
   rewardClaims: number;
   sponsorClicks: number;
+  funnel?: {
+    landingViews: number;
+    bubbleJoins: number;
+    liveViews: number;
+    scoreStarted: number;
+    scoreSaved: number;
+    contactModalOpened: number;
+    contactSaved: number;
+  };
+  engagement?: {
+    benefitsViews: number;
+    benefitsClicks: number;
+    communityViews: number;
+    communityPosts: number;
+    tabLiveClicks: number;
+    tabCommunityClicks: number;
+    tabBenefitsClicks: number;
+  };
+  conversionRates?: {
+    landingToJoin: number;
+    liveToScoreSaved: number;
+    scoreSavedToContact: number;
+    liveToContact: number;
+  };
+  topEvents?: Array<{ event: string; count: number }>;
+  learnings?: string[];
   topModules: Array<{ module: string; count: number }>;
   recentEvents: Array<{ id: string; event_type: string; path: string | null; device_type: string; created_at: string }>;
 };
@@ -1635,15 +1661,37 @@ function TogglePill({ checked, onChange, label }: { checked: boolean; onChange: 
 }
 
 function AnalyticsPanel({ summary, message, bubble, adminSecret }: { summary: AnalyticsSummary | null; message: string; bubble: BuilderBubble; adminSecret: string }) {
+  const funnel = summary?.funnel;
+  const engagement = summary?.engagement;
+  const conversionRates = summary?.conversionRates;
   const metrics = [
     ["Besucher", summary?.visitors ?? 0],
     ["Sessions", summary?.sessions ?? 0],
     ["Page Views", summary?.pageViews ?? 0],
-    ["Poll Votes", summary?.pollVotes ?? 0],
-    ["Community Posts", summary?.communityPosts ?? 0],
-    ["Reward Views", summary?.rewardViews ?? 0],
-    ["Reward Claims", summary?.rewardClaims ?? 0],
-    ["Sponsor Clicks", summary?.sponsorClicks ?? 0],
+  ];
+  const funnelRows: Array<[string, number]> = [
+    ["Landing Views", funnel?.landingViews ?? 0],
+    ["Bubble Beitritte", funnel?.bubbleJoins ?? 0],
+    ["Live Views", funnel?.liveViews ?? 0],
+    ["Tipp gestartet", funnel?.scoreStarted ?? 0],
+    ["Tipp gespeichert", funnel?.scoreSaved ?? 0],
+    ["Kontaktmodal geöffnet", funnel?.contactModalOpened ?? 0],
+    ["Kontakt hinterlegt", funnel?.contactSaved ?? 0],
+  ];
+  const engagementRows: Array<[string, number]> = [
+    ["Benefits Views", engagement?.benefitsViews ?? summary?.rewardViews ?? 0],
+    ["Benefits Klicks", engagement?.benefitsClicks ?? 0],
+    ["Community Views", engagement?.communityViews ?? 0],
+    ["Community Posts", engagement?.communityPosts ?? summary?.communityPosts ?? 0],
+    ["Tab Live", engagement?.tabLiveClicks ?? 0],
+    ["Tab Community", engagement?.tabCommunityClicks ?? 0],
+    ["Tab Vorteile", engagement?.tabBenefitsClicks ?? 0],
+  ];
+  const conversionRows: Array<[string, number]> = [
+    ["Landing → Beitritt", conversionRates?.landingToJoin ?? 0],
+    ["Live View → Tipp gespeichert", conversionRates?.liveToScoreSaved ?? 0],
+    ["Tipp gespeichert → Kontakt", conversionRates?.scoreSavedToContact ?? 0],
+    ["Live View → Kontakt", conversionRates?.liveToContact ?? 0],
   ];
 
   return (
@@ -1658,10 +1706,37 @@ function AnalyticsPanel({ summary, message, bubble, adminSecret }: { summary: An
           </div>
         ))}
       </div>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <AnalyticsList title="Funnel" rows={funnelRows} />
+        <AnalyticsList title="Engagement" rows={engagementRows} />
+        <section className="rounded-[1.25rem] border border-outline-variant/35 p-4">
+          <h3 className="mb-3 font-bold text-on-surface">Conversion Rates</h3>
+          {conversionRows.map(([label, value]) => (
+            <p key={label} className="flex justify-between border-t border-outline-variant/25 py-2 text-sm">
+              <span>{label}</span>
+              <strong>{value}%</strong>
+            </p>
+          ))}
+        </section>
+      </div>
+      <section className="rounded-[1.25rem] border border-outline-variant/35 p-4">
+        <h3 className="mb-3 font-bold text-on-surface">Learnings</h3>
+        {summary?.learnings?.length ? (
+          <div className="flex flex-wrap gap-2">
+            {summary.learnings.map((learning) => (
+              <span key={learning} className="rounded-full bg-surface px-3 py-1.5 text-xs font-black text-primary">
+                {learning}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-on-surface-variant">Noch keine klaren Learnings.</p>
+        )}
+      </section>
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-[1.25rem] border border-outline-variant/35 p-4">
-          <h3 className="mb-3 flex items-center gap-2 font-bold text-on-surface"><BarChart3 size={18} /> Top Module Klicks</h3>
-          {summary?.topModules.length ? summary.topModules.map((item) => <p key={item.module} className="flex justify-between border-t border-outline-variant/25 py-2 text-sm"><span>{item.module}</span><strong>{item.count}</strong></p>) : <p className="text-sm text-on-surface-variant">Noch keine Modul-Klicks.</p>}
+          <h3 className="mb-3 flex items-center gap-2 font-bold text-on-surface"><BarChart3 size={18} /> Top Events</h3>
+          {summary?.topEvents?.length ? summary.topEvents.map((item) => <p key={item.event} className="flex justify-between border-t border-outline-variant/25 py-2 text-sm"><span>{item.event}</span><strong>{item.count}</strong></p>) : <p className="text-sm text-on-surface-variant">Noch keine Events.</p>}
         </section>
         <section className="rounded-[1.25rem] border border-outline-variant/35 p-4">
           <h3 className="mb-3 font-bold text-on-surface">Letzte Events</h3>
@@ -1677,6 +1752,20 @@ function AnalyticsPanel({ summary, message, bubble, adminSecret }: { summary: An
       </div>
       {isPublicViewingPilotSlug(bubble.slug) ? <HuberPilotAdmin adminSecret={adminSecret} bubble={bubble} /> : null}
     </div>
+  );
+}
+
+function AnalyticsList({ title, rows }: { title: string; rows: Array<[string, number]> }) {
+  return (
+    <section className="rounded-[1.25rem] border border-outline-variant/35 p-4">
+      <h3 className="mb-3 font-bold text-on-surface">{title}</h3>
+      {rows.map(([label, value]) => (
+        <p key={label} className="flex justify-between border-t border-outline-variant/25 py-2 text-sm">
+          <span>{label}</span>
+          <strong>{value}</strong>
+        </p>
+      ))}
+    </section>
   );
 }
 
