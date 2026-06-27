@@ -63,7 +63,7 @@ values (
       {
         "active":true,
         "title":"Das kannst du gewinnen",
-        "description":"Unter allen gültigen Tipps werden die Gewinne nach dem Spiel vergeben. Exakte Treffer haben Vorrang bei der Auswertung.",
+        "description":"2× 20 € Gutschein zum direkten Einlösen auf der Veranstaltung.",
         "code":"",
         "buttonText":"Hinweis ansehen",
         "hint":"Gewinner werden über die angegebene Telefonnummer oder E-Mail benachrichtigt."

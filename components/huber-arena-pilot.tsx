@@ -8,7 +8,7 @@ import { MobilePage } from "@/components/mobile-page";
 import { ensureBubbleVisitor } from "@/lib/bubble-service";
 import { bubblePath } from "@/lib/bubble-routing";
 import { useBubbleConfig } from "@/lib/bubble-config";
-import { outcomeLabel, parseExactScoreText, type MatchOutcome } from "@/lib/match-prediction";
+import { outcomeFromScores, outcomeLabel, parseExactScoreText, type MatchOutcome } from "@/lib/match-prediction";
 import { getPilotOutcomeLabels, getPublicViewingPilotConfig, outcomeOptionsForPilot } from "@/lib/public-viewing-pilot";
 import { getOrCreateSessionId } from "@/lib/storage";
 import type { BubbleMatchStateRow, MatchPredictionRow, VisitorRow } from "@/lib/supabase/types";
@@ -50,6 +50,8 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
   const [contactValue, setContactValue] = useState("");
   const [outcomePick, setOutcomePick] = useState<MatchOutcome | "">("");
   const [exactScoreText, setExactScoreText] = useState("");
+  const [quickbornHomeScore, setQuickbornHomeScore] = useState("");
+  const [quickbornAwayScore, setQuickbornAwayScore] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -101,6 +103,11 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
           setContactValue(data.prediction.contact_value ?? "");
           setOutcomePick(data.prediction.outcome_pick);
           setExactScoreText(data.prediction.exact_score_text ?? "");
+          if (bubbleSlug === "public-viewing-quickborn") {
+            const parsed = parseExactScoreText(data.prediction.exact_score_text ?? "");
+            setQuickbornHomeScore(parsed.germanyScore === null ? "" : String(parsed.germanyScore));
+            setQuickbornAwayScore(parsed.ecuadorScore === null ? "" : String(parsed.ecuadorScore));
+          }
           setSaved(true);
         }
       } catch (error) {
@@ -121,7 +128,7 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
       setMessage("Besucher wird noch vorbereitet. Bitte kurz erneut versuchen.");
       return;
     }
-    if (!outcomePick) {
+    if (!requiresExactScore && !outcomePick) {
       setMessage("Bitte wähle, wer heute gewinnt.");
       return;
     }
@@ -135,8 +142,11 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
   }
 
   async function savePrediction(saveContact: boolean) {
-    if (!visitor || !outcomePick) return;
-    if (requiresExactScore && parseExactScoreText(exactScoreText).parseStatus !== "parsed") {
+    if (!visitor) return;
+    const parsed = parseExactScoreText(exactScoreText);
+    const effectiveOutcomePick = requiresExactScore && parsed.parsedOutcome ? parsed.parsedOutcome : outcomePick;
+    if (!effectiveOutcomePick) return;
+    if (requiresExactScore && parsed.parseStatus !== "parsed") {
       setMessage("Bitte gib zuerst deinen genauen Ergebnistipp ab, um am Gewinnspiel teilzunehmen.");
       setContactModalOpen(false);
       return;
@@ -159,7 +169,7 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
         sessionId: getOrCreateSessionId(bubbleSlug),
         displayName,
         contactValue: saveContact ? contactValue : "",
-        outcomePick,
+        outcomePick: effectiveOutcomePick,
         exactScoreText,
         privacyConsentAccepted: privacyAccepted,
       });
@@ -176,6 +186,27 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
       setMessage(error instanceof Error ? error.message : "Tipp konnte nicht gespeichert werden.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  function updateQuickbornScore(side: "home" | "away", value: string) {
+    const clean = value.replace(/\D/g, "").slice(0, 2);
+    const nextHome = side === "home" ? clean : quickbornHomeScore;
+    const nextAway = side === "away" ? clean : quickbornAwayScore;
+    setQuickbornHomeScore(nextHome);
+    setQuickbornAwayScore(nextAway);
+
+    if (nextHome === "" || nextAway === "") {
+      setExactScoreText("");
+      setOutcomePick("");
+      return;
+    }
+
+    const homeScore = Number(nextHome);
+    const awayScore = Number(nextAway);
+    if (Number.isInteger(homeScore) && Number.isInteger(awayScore) && homeScore >= 0 && awayScore >= 0) {
+      setExactScoreText(`${homeScore}:${awayScore}`);
+      setOutcomePick(outcomeFromScores(homeScore, awayScore));
     }
   }
 
@@ -203,44 +234,59 @@ export function HuberArenaPilot({ bubbleSlug }: { bubbleSlug: string }) {
           />
         ) : (
           <section className="rounded-[1.35rem] bg-white p-4 shadow-ambient">
-            {requiresExactScore ? (
-              <p className="mb-4 rounded-[1rem] bg-surface px-3 py-3 text-sm font-bold leading-5 text-on-surface-variant">{pilotConfig.mainText}</p>
-            ) : null}
             <form className="space-y-5" onSubmit={openContactStep}>
-              <div>
-                <p className="mb-3 text-base font-black text-on-surface">Wer gewinnt heute?</p>
-                <div className="grid gap-2">
-                  {outcomeOptions.map((option) => {
-                    const active = outcomePick === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        className={[
-                          "flex min-h-14 items-center justify-between rounded-[1.15rem] border-2 px-4 text-left text-base font-black transition active:scale-[0.99]",
-                          active ? "border-primary bg-primary/10 text-primary" : "border-outline-variant/40 bg-white text-on-surface",
-                        ].join(" ")}
-                        type="button"
-                        onClick={() => setOutcomePick(option.value)}
-                      >
-                        {option.label}
-                        {active ? <Check size={20} /> : null}
-                      </button>
-                    );
-                  })}
+              {requiresExactScore ? (
+                <div>
+                  <p className="mb-3 text-base font-black text-on-surface">Dein genauer Ergebnistipp</p>
+                  <div className="rounded-[1.15rem] bg-surface p-3">
+                    <div className="grid grid-cols-[minmax(0,1fr)_64px_auto_64px_minmax(0,1fr)] items-center gap-2">
+                      <span className="min-w-0 text-right text-sm font-black leading-5 text-on-surface">{activeHomeTeam}</span>
+                      <ScoreInput value={quickbornHomeScore} onChange={(value) => updateQuickbornScore("home", value)} label={`${activeHomeTeam} Tore`} />
+                      <span className="text-xl font-black text-outline">:</span>
+                      <ScoreInput value={quickbornAwayScore} onChange={(value) => updateQuickbornScore("away", value)} label={`${activeAwayTeam} Tore`} />
+                      <span className="min-w-0 text-sm font-black leading-5 text-on-surface">{activeAwayTeam}</span>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs font-semibold leading-5 text-on-surface-variant">Nur mit einem gültigen Ergebnistipp nimmst du am Gewinnspiel teil.</p>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div>
+                    <p className="mb-3 text-base font-black text-on-surface">Wer gewinnt heute?</p>
+                    <div className="grid gap-2">
+                      {outcomeOptions.map((option) => {
+                        const active = outcomePick === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            className={[
+                              "flex min-h-14 items-center justify-between rounded-[1.15rem] border-2 px-4 text-left text-base font-black transition active:scale-[0.99]",
+                              active ? "border-primary bg-primary/10 text-primary" : "border-outline-variant/40 bg-white text-on-surface",
+                            ].join(" ")}
+                            type="button"
+                            onClick={() => setOutcomePick(option.value)}
+                          >
+                            {option.label}
+                            {active ? <Check size={20} /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-              <label className="block">
-                <span className="mb-2 block text-sm font-bold text-on-surface">Dein genauer Ergebnistipp</span>
-                <input
-                  value={exactScoreText}
-                  onChange={(event) => setExactScoreText(event.target.value)}
-                  placeholder={`z. B. 2:1 ${activeHomeTeam}`}
-                  className="h-14 w-full rounded-[1.15rem] border-2 border-outline-variant/40 bg-surface px-4 text-base font-semibold text-on-surface outline-none placeholder:text-outline focus:border-primary"
-                  maxLength={120}
-                />
-                <span className="mt-2 block text-xs font-semibold leading-5 text-on-surface-variant">Schreib dein Ergebnis einfach rein, z. B. 2:1 oder 1:1.</span>
-              </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold text-on-surface">Dein genauer Ergebnistipp</span>
+                    <input
+                      value={exactScoreText}
+                      onChange={(event) => setExactScoreText(event.target.value)}
+                      placeholder={`z. B. 2:1 ${activeHomeTeam}`}
+                      className="h-14 w-full rounded-[1.15rem] border-2 border-outline-variant/40 bg-surface px-4 text-base font-semibold text-on-surface outline-none placeholder:text-outline focus:border-primary"
+                      maxLength={120}
+                    />
+                    <span className="mt-2 block text-xs font-semibold leading-5 text-on-surface-variant">Schreib dein Ergebnis einfach rein, z. B. 2:1 oder 1:1.</span>
+                  </label>
+                </>
+              )}
 
               <button className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-primary text-base font-black text-on-primary shadow-active transition active:scale-[0.98] disabled:opacity-60" type="submit" disabled={busy}>
                 <Ticket size={19} />
@@ -399,6 +445,21 @@ function TeamBlock({ flag, team, align }: { flag: string; team: string; align: "
       <p className="text-[30px] leading-none">{flag}</p>
       <p className="mt-2 truncate text-[15px] font-black leading-5">{team}</p>
     </div>
+  );
+}
+
+function ScoreInput({ value, onChange, label }: { value: string; onChange: (value: string) => void; label: string }) {
+  return (
+    <input
+      aria-label={label}
+      className="h-14 w-16 rounded-[1rem] border-2 border-outline-variant/40 bg-white text-center text-xl font-black text-on-surface outline-none focus:border-primary"
+      type="number"
+      inputMode="numeric"
+      min={0}
+      max={99}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
   );
 }
 

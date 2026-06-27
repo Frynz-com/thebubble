@@ -18,7 +18,6 @@ export function HuberArenaEntry({ bubbleSlug }: { bubbleSlug: string }) {
   const [message, setMessage] = useState("");
   const [heroFailed, setHeroFailed] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
-  const [matchLogoFailed, setMatchLogoFailed] = useState(false);
   const isQuickborn = normalizedSlug === "public-viewing-quickborn";
 
   async function enterBubble() {
@@ -61,42 +60,26 @@ export function HuberArenaEntry({ bubbleSlug }: { bubbleSlug: string }) {
 
       <div className="phone-shell relative z-10 flex min-h-svh flex-col px-5 pb-[calc(2.25rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
         {isQuickborn ? (
-          <section className="animate-pop-in">
-            <div className="flex items-start justify-between gap-3">
+          <section className="animate-pop-in pt-[calc(.75rem+env(safe-area-inset-top))]">
+            <div className="flex justify-center">
               {pilotConfig.logoUrl && !logoFailed ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={pilotConfig.logoUrl}
                   alt="Public Viewing Quickborn"
-                  className="max-h-28 w-auto max-w-[46vw] rounded-[1.1rem] bg-white/94 px-3 py-2 shadow-[0_18px_48px_rgba(0,0,0,.24)]"
+                  className="max-h-[168px] w-auto max-w-[78vw] rounded-[1.25rem] bg-white/96 px-4 py-3 shadow-[0_18px_48px_rgba(0,0,0,.24)]"
                   onError={() => setLogoFailed(true)}
                 />
               ) : (
-                <div className="rounded-[1.1rem] bg-white/94 px-4 py-3 text-left shadow-[0_18px_48px_rgba(0,0,0,.24)]">
-                  <p className="text-sm font-black leading-4 text-on-surface">Public Viewing</p>
-                  <p className="text-lg font-black leading-5 text-primary">Quickborn</p>
+                <div className="rounded-[1.25rem] bg-white/96 px-5 py-4 text-center shadow-[0_18px_48px_rgba(0,0,0,.24)]">
+                  <p className="text-base font-black leading-5 text-on-surface">Public Viewing</p>
+                  <p className="text-2xl font-black leading-7 text-primary">Quickborn</p>
                 </div>
               )}
-              {pilotConfig.matchEventLogoUrl && !matchLogoFailed ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={pilotConfig.matchEventLogoUrl}
-                  alt="Match Events"
-                  className="max-h-12 w-auto max-w-[38vw] rounded-[.9rem] bg-white/94 px-3 py-2 shadow-[0_14px_34px_rgba(0,0,0,.2)]"
-                  onError={() => setMatchLogoFailed(true)}
-                />
-              ) : null}
             </div>
           </section>
         ) : null}
         <section className="mt-auto animate-pop-in text-center">
-          {isQuickborn ? (
-            <div className="mb-5 text-left text-white">
-              <h1 className="text-[34px] font-black leading-[38px] tracking-normal drop-shadow-[0_8px_24px_rgba(0,0,0,.36)]">Deutschland vs. Paraguay</h1>
-              <p className="mt-2 text-lg font-black text-white/90">Public Viewing Quickborn</p>
-              <p className="mt-3 max-w-sm text-sm font-semibold leading-5 text-white/78">{pilotConfig.mainText}</p>
-            </div>
-          ) : null}
           <button
             className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-6 text-base font-black text-primary shadow-[0_18px_44px_rgba(0,0,0,.28)] ring-1 ring-white/55 transition active:scale-[0.98] disabled:opacity-70"
             type="button"
@@ -107,7 +90,7 @@ export function HuberArenaEntry({ bubbleSlug }: { bubbleSlug: string }) {
             {isQuickborn ? "Jetzt Bubble beitreten" : "Jetzt Bubble betreten"}
             {!busy ? <ArrowRight size={20} /> : null}
           </button>
-          {isQuickborn ? <p className="mt-3 px-2 text-xs font-semibold leading-5 text-white/78">Mit dem Beitritt akzeptierst du die Teilnahmebedingungen und die Datenschutzhinweise.</p> : null}
+          {isQuickborn ? <p className="mt-3 px-2 text-xs font-semibold leading-5 text-white drop-shadow-[0_3px_10px_rgba(0,0,0,.55)]">Mit dem Beitritt akzeptierst du die Teilnahmebedingungen und Datenschutzhinweise.</p> : null}
           {message ? <p className="mt-3 rounded-[1rem] bg-white/90 px-3 py-2 text-sm font-bold text-on-surface">{message}</p> : null}
         </section>
       </div>

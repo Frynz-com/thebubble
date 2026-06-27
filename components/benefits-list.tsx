@@ -81,9 +81,8 @@ export function BenefitsList() {
               <Gift size={20} />
             </div>
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-white/65">Gewinnspiel</p>
-              <h2 className="mt-2 text-2xl font-black leading-7">{pilotConfig.prizeTitle}</h2>
-              <p className="mt-2 text-sm font-semibold leading-5 text-white/75">{pilotConfig.benefitsIntro}</p>
+              <h2 className="text-2xl font-black leading-7">{pilotConfig.prizeTitle}</h2>
+              <p className="mt-2 text-lg font-black leading-6 text-white">{pilotConfig.prizeMain}</p>
             </div>
           </div>
         </div>
