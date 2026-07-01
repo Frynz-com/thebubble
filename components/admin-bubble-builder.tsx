@@ -9,10 +9,11 @@ import { formatBubbleType, heroMediaStyle, heroOverlayBackground, logoFrameClass
 import type { HeroFit, HeroOverlay, HeroPositionX, HeroPositionY, HeroZoom, LogoBackground, LogoFit, LogoShape, LogoSize } from "@/lib/bubble-config";
 import { bubblePath, isReservedBubbleSlug } from "@/lib/bubble-routing";
 import { isPublicViewingPilotSlug } from "@/lib/public-viewing-pilot";
+import { DemoAnalytics } from "@/components/admin/DemoAnalytics";
 import { HuberPilotAdmin } from "@/components/huber-pilot-admin";
 
 const featureKeys = ["live", "community", "polls", "rewards", "peopleHere", "fanBattle", "sponsorCard"] as const;
-const sections = ["overview", "basics", "branding", "modules", "liveAction", "community", "rewards", "sponsor", "analytics"] as const;
+const sections = ["overview", "basics", "branding", "modules", "liveAction", "community", "rewards", "sponsor", "analytics", "demoAnalytics"] as const;
 
 type FeatureKey = (typeof featureKeys)[number];
 type ConfigTextKey =
@@ -266,6 +267,7 @@ const sectionLabels: Record<Section, string> = {
   rewards: "Vorteile",
   sponsor: "Sponsor",
   analytics: "Analytics",
+  demoAnalytics: "Demo Analytics",
 };
 
 const featureLabels: Record<FeatureKey, string> = {
@@ -764,7 +766,7 @@ export function AdminBubbleBuilder() {
               <Plus size={17} />
               Neue Bubble
             </button>
-            <button className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-on-primary shadow-active disabled:opacity-60" type="button" onClick={() => void saveBubble()} disabled={busy || activeSection === "overview" || activeSection === "analytics" || !canSave}>
+            <button className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-on-primary shadow-active disabled:opacity-60" type="button" onClick={() => void saveBubble()} disabled={busy || activeSection === "overview" || activeSection === "analytics" || activeSection === "demoAnalytics" || !canSave}>
               <Save size={17} />
               {busy ? "Speichere ..." : "Speichern"}
             </button>
@@ -772,8 +774,8 @@ export function AdminBubbleBuilder() {
         </header>
 
         <div className="grid gap-5 lg:grid-cols-[230px_1fr]">
-          <aside className="rounded-[1.5rem] bg-white p-3 shadow-ambient lg:sticky lg:top-5 lg:self-start">
-            <nav className="flex gap-2 overflow-x-auto lg:block lg:space-y-1">
+          <aside className="min-w-0 rounded-[1.5rem] bg-white p-3 shadow-ambient lg:sticky lg:top-5 lg:self-start">
+            <nav className="flex w-full gap-2 overflow-x-auto lg:block lg:space-y-1">
               {sections.map((section) => (
                 <button
                   key={section}
@@ -796,6 +798,8 @@ export function AdminBubbleBuilder() {
               <Overview bubbles={sortedBubbles} onEdit={selectBubble} onNew={resetForm} />
             ) : activeSection === "analytics" ? (
               <AnalyticsPanel summary={analytics} message={analyticsMessage} bubble={form} adminSecret={secret} />
+            ) : activeSection === "demoAnalytics" ? (
+              <DemoAnalytics adminSecret={secret} />
             ) : (
               <form className="rounded-[1.5rem] bg-white p-5 shadow-ambient" onSubmit={saveBubble}>
                 <SectionHeading title={sectionLabels[activeSection]} subtitle={form.name ? `${form.name} · /${normalizedFormSlug || "slug-fehlt"}` : "Neue Bubble"} />

@@ -1,6 +1,11 @@
-import { BubbleLandingScreen } from "@/components/bubble-landing-screen";
-import { defaultBubbleSlug } from "@/lib/bubble-routing";
+import type { Metadata } from "next";
+import { DemoHub } from "@/components/demo/DemoHub";
 
-export default function DemoLandingPage() {
-  return <BubbleLandingScreen bubbleSlug={defaultBubbleSlug} />;
+export const metadata: Metadata = {
+  title: "The Bubble Demo",
+  description: "Erlebe in 60 Sekunden, wie aus einem QR-Scan eine messbare Aktion vor Ort wird.",
+};
+
+export default function DemoPage() {
+  return <DemoHub />;
 }

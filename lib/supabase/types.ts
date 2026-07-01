@@ -162,6 +162,31 @@ export type AnalyticsEventRow = {
   created_at: string;
 };
 
+export type DemoEventName =
+  | "demo_view"
+  | "demo_choose_visitor"
+  | "demo_choose_dashboard"
+  | "visitor_home_view"
+  | "visitor_action_view"
+  | "visitor_tip_submit"
+  | "visitor_reward_view"
+  | "reward_coupon_click"
+  | "reward_wallet_save"
+  | "dashboard_home_view"
+  | "dashboard_create_view"
+  | "dashboard_setup_view"
+  | "dashboard_contact_click"
+  | "demo_showcase_view"
+  | "demo_contact_click";
+
+export type DemoEventRow = {
+  id: string;
+  event_name: DemoEventName;
+  mode: "visitor" | "dashboard" | null;
+  metadata: Json;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -214,6 +239,11 @@ export type Database = {
         Row: AnalyticsEventRow;
         Insert: Partial<AnalyticsEventRow> & Pick<AnalyticsEventRow, "bubble_id" | "event_type">;
         Update: Partial<AnalyticsEventRow>;
+      };
+      demo_events: {
+        Row: DemoEventRow;
+        Insert: Partial<DemoEventRow> & Pick<DemoEventRow, "event_name">;
+        Update: Partial<DemoEventRow>;
       };
     };
     Functions: {
