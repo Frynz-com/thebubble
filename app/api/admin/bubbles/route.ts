@@ -67,6 +67,8 @@ type RewardPayload = {
   hint?: string;
 };
 
+type StudioConfigPayload = Record<string, unknown>;
+
 type BubblePayload = {
   id?: string;
   name?: string;
@@ -82,7 +84,7 @@ type BubblePayload = {
   reward_description?: string;
   reward_terms?: string;
   features?: Partial<Record<FeatureKey, boolean>>;
-  config?: Partial<Record<ConfigTextKey, string> & { rewardLinked: boolean; rewards: RewardPayload[] }>;
+  config?: Partial<Record<ConfigTextKey, string> & { rewardLinked: boolean; rewards: RewardPayload[]; studio: StudioConfigPayload }>;
   is_active?: boolean;
 };
 
@@ -157,13 +159,18 @@ function normalizeRewards(config: BubblePayload["config"]) {
   return rewards.slice(0, 3).map(normalizeReward);
 }
 
+function normalizeStudioConfig(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as StudioConfigPayload) : null;
+}
+
 function normalizeConfig(config: BubblePayload["config"]) {
-  const textConfig = Object.fromEntries(configTextKeys.map((key) => [key, cleanText(config?.[key])]));
-  const pollOptions = cleanText(config?.pollOptions)
+  const pollOptions = (Array.isArray(config?.pollOptions) ? config?.pollOptions.join("\n") : cleanText(config?.pollOptions))
     .split(/\r?\n|,/)
     .map((option) => option.trim())
     .filter(Boolean)
     .slice(0, 6);
+  const textConfig = Object.fromEntries(configTextKeys.map((key) => [key, key === "pollOptions" ? pollOptions.join("\n") : cleanText(config?.[key])]));
+  const studioConfig = normalizeStudioConfig(config?.studio);
 
   return {
     ...textConfig,
@@ -174,6 +181,7 @@ function normalizeConfig(config: BubblePayload["config"]) {
       options: pollOptions,
       hint: cleanText(config?.pollHint),
     },
+    ...(studioConfig ? { studio: studioConfig } : {}),
   };
 }
 
@@ -251,6 +259,7 @@ export async function POST(request: NextRequest) {
   }
 
   const normalizedConfig = normalizeConfig(payload.config);
+  const isStudioCreate = Boolean(!id && normalizedConfig.studio);
   const primaryReward =
     normalizedConfig.rewards.find((reward) => reward.active && reward.title) ?? normalizedConfig.rewards.find((reward) => reward.title);
 
@@ -270,7 +279,7 @@ export async function POST(request: NextRequest) {
     reward_terms: nullableText(primaryReward?.hint ?? payload.reward_terms),
     features: normalizeFeatures(payload.features),
     config: normalizedConfig,
-    is_active: payload.is_active ?? true,
+    is_active: isStudioCreate ? false : payload.is_active ?? true,
     updated_at: new Date().toISOString(),
   };
 

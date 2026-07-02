@@ -284,6 +284,17 @@ export type BubbleStudioItem = {
   isTemplate: boolean;
 };
 
+export type BubbleStudioExistingItem = {
+  id: string;
+  name: string;
+  slug: string;
+  partnerName: string;
+  eventType: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+};
+
 export type ChecklistItemKey =
   | "basics"
   | "cover"

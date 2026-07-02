@@ -207,7 +207,8 @@ export function buildBubbleConfigFromDraft(draft: BubbleDraft): BubbleInsertPayl
     reward_title: firstReward?.title || null,
     reward_description: firstReward?.description || null,
     reward_terms: firstReward?.redemptionHint || null,
-    is_active: draft.status === "live",
+    // Bubble Studio speichert immer inaktive Entwürfe. Live-Aktivierung bleibt im bestehenden Admin.
+    is_active: false,
     features: {
       live: Boolean(draft.modules.liveVoting || draft.modules.scorePrediction || draft.modules.giveaway),
       community: Boolean(draft.modules.community && draft.legal.communityEnabled),
@@ -220,12 +221,13 @@ export function buildBubbleConfigFromDraft(draft: BubbleDraft): BubbleInsertPayl
     config: {
       headline: draft.cover.title,
       subheadline: draft.cover.description,
-      actionButtonText: draft.cover.buttonText,
       challengeTitle: "Live-Aktion",
       challengeDescription: draft.liveAction.question,
+      actionButtonText: draft.liveAction.buttonText,
       actionHint: draft.liveAction.hint,
       pollQuestion: isVoting ? draft.liveAction.question : "",
-      pollOptions: isVoting ? draft.liveAction.options : [],
+      pollOptions: isVoting ? draft.liveAction.options.join("\n") : "",
+      pollHint: isVoting ? draft.liveAction.hint : "",
       voteTitle: isVoting ? draft.liveAction.question : "",
       communityRules: draft.legal.communityNote,
       rewardCta: "Vorteil sichern",

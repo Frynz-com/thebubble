@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, CircleCheck, CircleDashed, ImageIcon, Link2, Plus, Radio, Rocket, Save, Trash2, X } from "lucide-react";
 import { DESIGN_PRESETS } from "@/lib/bubble-studio/design-presets";
 import {
@@ -33,18 +34,27 @@ const STEPS = [
   "Launch",
 ];
 
+type DraftSaveState = {
+  status: "idle" | "saving" | "success" | "error";
+  message: string;
+  slug?: string;
+};
+
 export function BubbleWizard({
   initialDraft,
   onFinish,
+  onSaveDraft,
   onCancel,
 }: {
   initialDraft?: BubbleDraft;
   onFinish: (draft: BubbleDraft) => void;
+  onSaveDraft: (draft: BubbleDraft) => Promise<{ name: string; slug: string }>;
   onCancel: () => void;
 }) {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<BubbleDraft>(initialDraft ?? createDraftFromTemplate(null));
   const [linkTouched, setLinkTouched] = useState(Boolean(initialDraft?.basics.bubbleLink));
+  const [draftSaveState, setDraftSaveState] = useState<DraftSaveState>({ status: "idle", message: "" });
 
   // Die Vorschau springt automatisch zu dem Bubble-Bereich, den man gerade bearbeitet.
   const [previewScreen, setPreviewScreen] = useState<PreviewScreen>("cover");
@@ -55,11 +65,17 @@ export function BubbleWizard({
 
   const checklist = useMemo(() => deriveLaunchChecklist(draft), [draft]);
 
+  function resetDraftSaveNotice() {
+    setDraftSaveState((current) => (current.status === "saving" ? current : { status: "idle", message: "" }));
+  }
+
   function patch(partial: Partial<BubbleDraft>) {
+    resetDraftSaveNotice();
     setDraft((prev) => ({ ...prev, ...partial }));
   }
 
   function selectTemplate(id: BubbleTemplateId) {
+    resetDraftSaveNotice();
     setDraft((prev) => {
       const fresh = createDraftFromTemplate(id);
       return { ...fresh, basics: { ...fresh.basics, ...prev.basics, expectedVisitors: prev.basics.expectedVisitors || fresh.basics.expectedVisitors } };
@@ -72,6 +88,28 @@ export function BubbleWizard({
       status,
       basics: { ...draft.basics, bubbleLink: draft.basics.bubbleLink || slugify(draft.basics.name) },
     });
+  }
+
+  async function saveDraft() {
+    if (draftSaveState.status === "saving") return;
+    setDraftSaveState({ status: "saving", message: "Entwurf wird gespeichert ..." });
+    try {
+      const result = await onSaveDraft({
+        ...draft,
+        status: "draft",
+        basics: { ...draft.basics, bubbleLink: draft.basics.bubbleLink || slugify(draft.basics.name) },
+      });
+      setDraftSaveState({
+        status: "success",
+        message: "Entwurf gespeichert. Du kannst ihn im bestehenden Admin weiter prüfen.",
+        slug: result.slug,
+      });
+    } catch (error) {
+      setDraftSaveState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Entwurf konnte nicht gespeichert werden.",
+      });
+    }
   }
 
   const canContinue = step === 0 ? draft.templateId !== null : step === 1 ? draft.basics.name.trim().length > 0 : true;
@@ -133,9 +171,9 @@ export function BubbleWizard({
             <StepLaunch
               draft={draft}
               checklist={checklist}
-              onSaveDraft={() => finishWith("draft")}
+              draftSaveState={draftSaveState}
+              onSaveDraft={saveDraft}
               onPreview={() => finishWith("preview")}
-              onLaunch={() => finishWith("live")}
             />
           ) : null}
 
@@ -651,15 +689,15 @@ function StepLegal({ draft, patch }: { draft: BubbleDraft; patch: (p: Partial<Bu
 function StepLaunch({
   draft,
   checklist,
+  draftSaveState,
   onSaveDraft,
   onPreview,
-  onLaunch,
 }: {
   draft: BubbleDraft;
   checklist: ReturnType<typeof deriveLaunchChecklist>;
+  draftSaveState: DraftSaveState;
   onSaveDraft: () => void;
   onPreview: () => void;
-  onLaunch: () => void;
 }) {
   const payload = useMemo(() => buildBubbleConfigFromDraft(draft), [draft]);
   const featuredNames = draft.home.featuredModules.map((id) => getModule(id)?.name).filter(Boolean);
@@ -683,7 +721,7 @@ function StepLaunch({
         </div>
       </SectionCard>
 
-      <SectionCard title="Launch Checklist" subtitle="Alles Grün? Dann kann die Bubble live gehen.">
+      <SectionCard title="Launch Checklist" subtitle="Entwürfe werden gespeichert und danach im bestehenden Admin geprüft.">
         <div className="space-y-2">
           {checklist.items.map((item) => (
             <div key={item.key} className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3.5">
@@ -701,10 +739,11 @@ function StepLaunch({
         <div className="flex flex-col gap-2.5 sm:flex-row">
           <button
             type="button"
+            disabled={draftSaveState.status === "saving"}
             onClick={onSaveDraft}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 transition hover:ring-slate-400"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 transition hover:ring-slate-400 disabled:opacity-60"
           >
-            <Save className="h-4 w-4" /> Als Entwurf speichern
+            <Save className="h-4 w-4" /> {draftSaveState.status === "saving" ? "Speichert ..." : "Als Entwurf speichern"}
           </button>
           <button
             type="button"
@@ -715,15 +754,26 @@ function StepLaunch({
           </button>
           <button
             type="button"
-            disabled={!checklist.readyToLaunch}
-            onClick={onLaunch}
+            disabled
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-emerald-500 disabled:opacity-40"
           >
-            <Rocket className="h-4 w-4" /> Live schalten
+            <Rocket className="h-4 w-4" /> Live erst im Admin
           </button>
         </div>
-        {!checklist.readyToLaunch ? <p className="mt-2 text-center text-xs text-slate-400">„Live schalten“ wird aktiv, sobald die Checklist vollständig ist.</p> : null}
-        <p className="mt-3 text-center text-[11px] text-slate-300">Prototyp-Modus: Es wird nichts dauerhaft gespeichert.</p>
+        {draftSaveState.status === "success" ? (
+          <div className="mt-3 rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-900 ring-1 ring-emerald-100">
+            <p className="font-extrabold">Entwurf gespeichert</p>
+            <p className="mt-1">{draftSaveState.message}</p>
+            {draftSaveState.slug ? <p className="mt-1 font-mono text-xs text-emerald-700">/{draftSaveState.slug}</p> : null}
+            <p className="mt-2 text-xs font-semibold text-emerald-700">Noch nicht live. Erst aktivieren, wenn alles geprüft ist.</p>
+            <Link href="/admin/bubbles" className="mt-3 inline-flex rounded-full bg-emerald-700 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-600">
+              Im bestehenden Admin prüfen
+            </Link>
+          </div>
+        ) : null}
+        {draftSaveState.status === "error" ? <p className="mt-3 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-700 ring-1 ring-red-100">{draftSaveState.message}</p> : null}
+        {!checklist.readyToLaunch ? <p className="mt-2 text-center text-xs text-slate-400">Die Checklist hilft beim Prüfen, Entwürfe bleiben aber immer inaktiv.</p> : null}
+        <p className="mt-3 text-center text-[11px] text-slate-300">„Als Entwurf speichern“ legt eine echte Bubble mit is_active=false an.</p>
       </SectionCard>
 
       <details className="rounded-3xl bg-slate-900 p-5 text-white">

@@ -1,14 +1,98 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { FlaskConical, LockKeyhole } from "lucide-react";
-import { createDraftFromTemplate, slugify } from "@/lib/bubble-studio/derive";
+import { buildBubbleConfigFromDraft, createDraftFromTemplate, slugify } from "@/lib/bubble-studio/derive";
 import { MOCK_BUBBLES } from "@/lib/bubble-studio/mock-data";
 import { getTemplate } from "@/lib/bubble-studio/template-presets";
-import type { BubbleDraft, BubbleStudioItem } from "@/lib/bubble-studio/types";
+import type { BubbleDraft, BubbleInsertPayload, BubbleStudioExistingItem, BubbleStudioItem } from "@/lib/bubble-studio/types";
 import { StudioDashboard } from "./dashboard";
 import { BubbleWizard } from "./wizard";
+
+const ADMIN_SESSION_KEY = "thebubble_admin_secret";
+
+type AdminBubbleApiItem = {
+  id: string;
+  slug: string;
+  name: string;
+  event_name?: string | null;
+  type?: string | null;
+  partner_name?: string | null;
+  is_active?: boolean | null;
+  created_at?: string;
+  updated_at?: string | null;
+};
+
+type AdminBubblesResponse = {
+  bubbles?: AdminBubbleApiItem[];
+  bubble?: AdminBubbleApiItem;
+  error?: string;
+  details?: string;
+  hint?: string;
+  code?: string;
+};
+
+type DraftSaveResult = {
+  name: string;
+  slug: string;
+};
+
+type AdminApiError = Error & {
+  status?: number;
+};
+
+async function adminBubblesRequest(method: "GET" | "POST", adminSecret: string, body?: BubbleInsertPayload): Promise<AdminBubblesResponse> {
+  const response = await fetch("/api/admin/bubbles", {
+    method,
+    headers: {
+      "content-type": "application/json",
+      "x-admin-secret": adminSecret,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = (await response.json().catch(() => ({}))) as AdminBubblesResponse;
+
+  if (!response.ok) {
+    const message = [json.error, json.details, json.hint].filter(Boolean).join(" | ") || "Admin-Anfrage fehlgeschlagen.";
+    const error = new Error(message) as AdminApiError;
+    error.status = response.status;
+    throw error;
+  }
+
+  return json;
+}
+
+function toExistingBubbleItem(bubble: AdminBubbleApiItem): BubbleStudioExistingItem {
+  return {
+    id: bubble.id,
+    name: bubble.name || "Unbenannte Bubble",
+    slug: bubble.slug,
+    partnerName: bubble.partner_name || "—",
+    eventType: bubble.type || bubble.event_name || "Bubble",
+    isActive: Boolean(bubble.is_active),
+    createdAt: bubble.created_at || "",
+    updatedAt: bubble.updated_at ?? null,
+  };
+}
+
+function toFriendlySaveError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (message.startsWith("Der Slug ")) return message;
+  if (message.startsWith("Name ist") || message.startsWith("Slug ist") || message.startsWith("Typ ist")) return message;
+  if (message.includes("Farben müssen")) return message;
+  if ((error as AdminApiError | undefined)?.status === 401) return "Dein Admin-Kontext ist abgelaufen. Bitte entsperre den bestehenden Admin erneut.";
+  return "Entwurf konnte nicht gespeichert werden. Bitte prüfe Name, Link und Admin-Kontext.";
+}
+
+function buildDraftSavePayload(draft: BubbleDraft): BubbleInsertPayload {
+  const payload = buildBubbleConfigFromDraft({ ...draft, status: "draft" });
+  return {
+    ...payload,
+    slug: payload.slug || slugify(draft.basics.name),
+    is_active: false,
+  };
+}
 
 /**
  * Bubble Studio — isolierter Lab-Prototyp für das zukünftige Admin-Dashboard.
@@ -16,13 +100,42 @@ import { BubbleWizard } from "./wizard";
  */
 export function BubbleStudioView() {
   const [hasAdminSession, setHasAdminSession] = useState<boolean | null>(null);
+  const [adminSecret, setAdminSecret] = useState("");
+  const [existingBubbles, setExistingBubbles] = useState<BubbleStudioExistingItem[]>([]);
+  const [existingBubblesLoading, setExistingBubblesLoading] = useState(false);
+  const [existingBubblesMessage, setExistingBubblesMessage] = useState("");
   const [items, setItems] = useState<BubbleStudioItem[]>(MOCK_BUBBLES);
   const [mode, setMode] = useState<"dashboard" | "wizard">("dashboard");
   const [wizardDraft, setWizardDraft] = useState<BubbleDraft | undefined>(undefined);
 
-  useEffect(() => {
-    setHasAdminSession(Boolean(window.sessionStorage.getItem("thebubble_admin_secret")));
+  const loadExistingBubbles = useCallback(async (secret: string) => {
+    if (!secret) return;
+    setExistingBubblesLoading(true);
+    setExistingBubblesMessage("");
+    try {
+      const json = await adminBubblesRequest("GET", secret);
+      setExistingBubbles((json.bubbles ?? []).map(toExistingBubbleItem));
+    } catch (error) {
+      console.error("[bubble-studio] existing bubbles load failed", error);
+      if ((error as AdminApiError | undefined)?.status === 401) {
+        window.sessionStorage.removeItem(ADMIN_SESSION_KEY);
+        setHasAdminSession(false);
+        setAdminSecret("");
+        setExistingBubblesMessage("Admin-Kontext abgelaufen. Bitte entsperre den bestehenden Admin erneut.");
+      } else {
+        setExistingBubblesMessage("Echte Bubbles konnten gerade nicht geladen werden.");
+      }
+    } finally {
+      setExistingBubblesLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    const storedSecret = window.sessionStorage.getItem(ADMIN_SESSION_KEY) ?? "";
+    setHasAdminSession(Boolean(storedSecret));
+    setAdminSecret(storedSecret);
+    if (storedSecret) void loadExistingBubbles(storedSecret);
+  }, [loadExistingBubbles]);
 
   function openWizard(draft?: BubbleDraft) {
     setWizardDraft(draft);
@@ -92,6 +205,26 @@ export function BubbleStudioView() {
     setWizardDraft(undefined);
   }
 
+  async function saveDraft(draft: BubbleDraft): Promise<DraftSaveResult> {
+    if (!adminSecret) {
+      throw new Error("Dein Admin-Kontext ist abgelaufen. Bitte entsperre den bestehenden Admin erneut.");
+    }
+
+    const payload = buildDraftSavePayload(draft);
+    try {
+      const json = await adminBubblesRequest("POST", adminSecret, payload);
+      const saved = json.bubble;
+      await loadExistingBubbles(adminSecret);
+      return {
+        name: saved?.name || payload.name,
+        slug: saved?.slug || payload.slug,
+      };
+    } catch (error) {
+      console.error("[bubble-studio] draft save failed", error);
+      throw new Error(toFriendlySaveError(error));
+    }
+  }
+
   if (hasAdminSession === null) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-sm font-semibold text-slate-500">
@@ -148,11 +281,20 @@ export function BubbleStudioView() {
 
       <main className="px-4 py-6 sm:px-6 sm:py-8">
         {mode === "dashboard" ? (
-          <StudioDashboard items={items} onCreate={() => openWizard(undefined)} onEdit={handleEdit} onDuplicate={handleDuplicate} />
+          <StudioDashboard
+            items={items}
+            existingBubbles={existingBubbles}
+            existingBubblesLoading={existingBubblesLoading}
+            existingBubblesMessage={existingBubblesMessage}
+            onCreate={() => openWizard(undefined)}
+            onEdit={handleEdit}
+            onDuplicate={handleDuplicate}
+          />
         ) : (
           <BubbleWizard
             initialDraft={wizardDraft}
             onFinish={handleFinish}
+            onSaveDraft={saveDraft}
             onCancel={() => {
               setMode("dashboard");
               setWizardDraft(undefined);
@@ -162,7 +304,7 @@ export function BubbleStudioView() {
       </main>
 
       <footer className="pb-8 text-center text-[11px] text-slate-300">
-        Isolierter Prototyp — speichert nichts, verändert keine bestehenden Bubbles.
+        Isolierter Prototyp — speichert neue Entwürfe inaktiv und verändert keine bestehenden Bubbles.
       </footer>
     </div>
   );

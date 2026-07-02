@@ -1,19 +1,26 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { BarChart3, Building2, CopyPlus, ExternalLink, FileText, Lock, Pencil, Plus, QrCode, ShieldCheck, Users } from "lucide-react";
 import { APP_BASE_URL, buildTrackingLinks, deriveFunnel, deriveTotals, formatDate, formatNumber } from "@/lib/bubble-studio/derive";
 import { MOCK_MEMBERS, ORGANIZATIONS, STUDIO_ROLES, getOrganization, getRole } from "@/lib/bubble-studio/organizations";
-import type { BubbleStudioItem, StudioMember, StudioOrganization, StudioRoleId } from "@/lib/bubble-studio/types";
+import type { BubbleStudioExistingItem, BubbleStudioItem, StudioMember, StudioOrganization, StudioRoleId } from "@/lib/bubble-studio/types";
 import { CopyButton, SectionCard, StatusBadge } from "./ui";
 
 export function StudioDashboard({
   items,
+  existingBubbles,
+  existingBubblesLoading,
+  existingBubblesMessage,
   onCreate,
   onEdit,
   onDuplicate,
 }: {
   items: BubbleStudioItem[];
+  existingBubbles: BubbleStudioExistingItem[];
+  existingBubblesLoading: boolean;
+  existingBubblesMessage: string;
   onCreate: () => void;
   onEdit: (item: BubbleStudioItem) => void;
   onDuplicate: (item: BubbleStudioItem) => void;
@@ -81,11 +88,16 @@ export function StudioDashboard({
         </div>
       </SectionCard>
 
+      <ExistingBubblesSection items={existingBubbles} loading={existingBubblesLoading} message={existingBubblesMessage} />
+
       {/* Bubble-Liste */}
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900">Deine Bubbles</h2>
-          <span className="text-xs text-slate-400">{items.length} gesamt</span>
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Demo-Daten</h2>
+            <p className="text-xs text-slate-400">Mock-Bubbles aus dem Lab, getrennt von echten Supabase-Daten.</p>
+          </div>
+          <span className="text-xs text-slate-400">{items.length} Demo-Bubbles</span>
         </div>
         <div className="space-y-3">
           {items.length === 0 ? (
@@ -104,6 +116,54 @@ export function StudioDashboard({
       {/* Organisationen & Zugänge (interaktiver Mock) */}
       <AccessSection items={items} />
     </div>
+  );
+}
+
+function ExistingBubblesSection({ items, loading, message }: { items: BubbleStudioExistingItem[]; loading: boolean; message: string }) {
+  return (
+    <SectionCard title="Echte Bubbles" subtitle="Read-only aus der bestehenden Admin-API geladen. Bearbeiten und Aktivieren bleibt im bestehenden Admin.">
+      {message ? <p className="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 ring-1 ring-amber-100">{message}</p> : null}
+      {loading ? <p className="text-sm font-semibold text-slate-500">Echte Bubbles werden geladen ...</p> : null}
+      {!loading && items.length === 0 ? (
+        <p className="text-sm text-slate-500">Keine echten Bubbles geladen.</p>
+      ) : (
+        <div className="space-y-2.5">
+          {items.map((item) => (
+            <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+              <span
+                className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                  item.isActive ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" : "bg-slate-200 text-slate-600"
+                }`}
+              >
+                {item.isActive ? "Aktiv" : "Inaktiv"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-extrabold text-slate-900">{item.name}</p>
+                <p className="truncate text-xs text-slate-500">
+                  /{item.slug} · {item.eventType} · {item.partnerName}
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <a
+                  href={`${APP_BASE_URL}/${item.slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:ring-slate-300"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" /> Link
+                </a>
+                <Link
+                  href="/admin/bubbles"
+                  className="inline-flex items-center rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-700"
+                >
+                  Im Admin prüfen
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
   );
 }
 
