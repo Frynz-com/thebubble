@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FlaskConical } from "lucide-react";
+import { FlaskConical, LockKeyhole } from "lucide-react";
 import { createDraftFromTemplate, slugify } from "@/lib/bubble-studio/derive";
 import { MOCK_BUBBLES } from "@/lib/bubble-studio/mock-data";
 import { getTemplate } from "@/lib/bubble-studio/template-presets";
@@ -15,9 +15,14 @@ import { BubbleWizard } from "./wizard";
  * Kompletter State lebt im Client. Keine Supabase-Zugriffe, keine Persistenz.
  */
 export function BubbleStudioView() {
+  const [hasAdminSession, setHasAdminSession] = useState<boolean | null>(null);
   const [items, setItems] = useState<BubbleStudioItem[]>(MOCK_BUBBLES);
   const [mode, setMode] = useState<"dashboard" | "wizard">("dashboard");
   const [wizardDraft, setWizardDraft] = useState<BubbleDraft | undefined>(undefined);
+
+  useEffect(() => {
+    setHasAdminSession(Boolean(window.sessionStorage.getItem("thebubble_admin_secret")));
+  }, []);
 
   function openWizard(draft?: BubbleDraft) {
     setWizardDraft(draft);
@@ -85,6 +90,41 @@ export function BubbleStudioView() {
     });
     setMode("dashboard");
     setWizardDraft(undefined);
+  }
+
+  if (hasAdminSession === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-sm font-semibold text-slate-500">
+        Admin-Kontext wird geprüft ...
+      </div>
+    );
+  }
+
+  if (!hasAdminSession) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10 text-slate-900">
+        <section className="w-full max-w-md rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <div className="mb-4 flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white">
+              <LockKeyhole className="h-5 w-5" />
+            </span>
+            <div>
+              <h1 className="text-xl font-extrabold">Bubble Studio Lab</h1>
+              <p className="text-sm font-semibold text-slate-500">Interner Admin-Kontext erforderlich</p>
+            </div>
+          </div>
+          <p className="text-sm leading-relaxed text-slate-600">
+            Diese Lab-Seite ist nur nach dem bestehenden Admin-Login sichtbar. Bitte entsperre zuerst den Admin-Bereich und öffne das Lab danach erneut.
+          </p>
+          <Link
+            href="/admin/bubbles"
+            className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-900 px-4 text-sm font-bold text-white transition hover:bg-slate-700"
+          >
+            Zum bestehenden Admin
+          </Link>
+        </section>
+      </main>
+    );
   }
 
   return (
